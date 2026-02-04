@@ -30,6 +30,9 @@ const local = new StruAI({ apiKey: process.env.STRUAI_API_KEY!, baseUrl: 'http:/
 // Analyze a PDF page
 const result = await client.drawings.analyze(file, { page: 4 });
 
+// Or reuse cached PDFs by hash (skips upload)
+const resultFromCache = await client.drawings.analyze(null, { page: 4, fileHash: "abc123def4567890" });
+
 console.log(`Processed in ${result.processing_ms}ms`);
 
 for (const leader of result.annotations.leaders) {
@@ -76,7 +79,7 @@ const entity = await project.entities.get('ent_abc123');
 All endpoints are under `/v1`. Use `Authorization: Bearer <API_KEY>`.
 
 Tier 1 (raw detection):
-- `POST /v1/drawings` — multipart form with `file` (PDF) and `page` (1-indexed)
+- `POST /v1/drawings` — multipart form with `file` (PDF) **or** `file_hash`, plus `page` (1-indexed)
 - `GET /v1/drawings/{id}`
 - `DELETE /v1/drawings/{id}`
 

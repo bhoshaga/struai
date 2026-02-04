@@ -34,6 +34,10 @@ Fast geometric detection. Returns annotations in ~1-2 seconds.
 # Analyze a PDF page
 result = client.drawings.analyze("structural.pdf", page=4)
 
+# Or reuse cached PDFs by hash (skips upload)
+file_hash = client.drawings.compute_file_hash("structural.pdf")
+result = client.drawings.analyze(page=4, file_hash=file_hash)
+
 print(f"Processed in {result.processing_ms}ms")
 print(f"Page size: {result.dimensions.width}x{result.dimensions.height}")
 
@@ -56,7 +60,7 @@ client.drawings.delete("drw_7f8a9b2c")
 All endpoints are under `/v1`. Use `Authorization: Bearer <API_KEY>`.
 
 Tier 1 (raw detection):
-- `POST /v1/drawings` — multipart form with `file` (PDF) and `page` (1-indexed)
+- `POST /v1/drawings` — multipart form with `file` (PDF) **or** `file_hash`, plus `page` (1-indexed)
 - `GET /v1/drawings/{id}`
 - `DELETE /v1/drawings/{id}`
 
@@ -82,6 +86,11 @@ Example (raw detection):
 curl -X POST "https://api.stru.ai/v1/drawings" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@structural.pdf" \
+  -F "page=4"
+
+curl -X POST "https://api.stru.ai/v1/drawings" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file_hash=abc123def4567890" \
   -F "page=4"
 ```
 

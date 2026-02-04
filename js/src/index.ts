@@ -243,16 +243,49 @@ class APIError extends Error {
 class Drawings {
   constructor(private client: StruAI) {}
 
+  private async computeFileHash(file: Blob): Promise<string> {
+    const buffer = await file.arrayBuffer();
+
+    if (globalThis.crypto?.subtle) {
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+      return bufferToHex(digest).slice(0, 16);
+    }
+
+    try {
+      const crypto = await import('node:crypto');
+      const hash = crypto.createHash('sha256').update(Buffer.from(buffer)).digest('hex');
+      return hash.slice(0, 16);
+    } catch {
+      throw new Error('SHA-256 not available in this environment.');
+    }
+  }
+
   async analyze(
-    file: File | Blob | string,
-    options: { page: number }
+    file: File | Blob | null,
+    options: { page: number; fileHash?: string }
   ): Promise<DrawingResult> {
     const formData = new FormData();
-    if (typeof file === 'string') {
-      // file path - only works in Node.js
-      throw new Error('File paths not supported in browser. Pass a File or Blob.');
+
+    let fileHash = options.fileHash;
+    if (!fileHash) {
+      if (!file) {
+        throw new Error('Provide file or fileHash.');
+      }
+      fileHash = await this.computeFileHash(file);
+      const cache = await this.client.request<{ cached: boolean }>(
+        `/drawings/cache/${fileHash}`
+      );
+      if (cache.cached) {
+        file = null;
+      }
     }
-    formData.append('file', file);
+
+    if (fileHash) {
+      formData.append('file_hash', fileHash);
+    }
+    if (file) {
+      formData.append('file', file);
+    }
     formData.append('page', options.page.toString());
 
     return this.client.request<DrawingResult>('/drawings', {
@@ -268,6 +301,12 @@ class Drawings {
   async delete(drawingId: string): Promise<void> {
     await this.client.request(`/drawings/${drawingId}`, { method: 'DELETE' });
   }
+}
+
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 class Job {
