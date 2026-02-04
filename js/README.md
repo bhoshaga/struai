@@ -30,6 +30,7 @@ const local = new StruAI({ apiKey: process.env.STRUAI_API_KEY!, baseUrl: 'http:/
 // Analyze a PDF page
 const result = await client.drawings.analyze(file, { page: 4 });
 
+// The SDK auto-hashes + checks cache when you pass a file.
 // Or reuse cached PDFs by hash (skips upload)
 const resultFromCache = await client.drawings.analyze(null, { page: 4, fileHash: "abc123def4567890" });
 
@@ -53,6 +54,7 @@ const project = await client.projects.create({
 // Add sheet (async processing)
 const job = await project.sheets.add(file, { page: 4 });
 
+// The SDK auto-hashes + checks cache when you pass a file.
 // Or reuse cached PDFs by hash (skips upload)
 const cachedJob = await project.sheets.add(null, { page: 4, fileHash: "abc123def4567890" });
 const result = await job.wait({ timeout: 120000 });
@@ -75,6 +77,21 @@ console.log(answer.answer);
 // Browse entities
 const entities = await project.entities.list({ type: 'Component', limit: 50 });
 const entity = await project.entities.get('ent_abc123');
+```
+
+## Cookbook
+
+```typescript
+const project = await client.projects.create({ name: 'Page12 Test' });
+const job = await project.sheets.add(file, { page: 12 });
+const sheetResult = await job.wait({ timeout: 180000 });
+
+const sheet = await project.sheets.get(sheetResult.sheet_id);
+const entities = await project.entities.list({ limit: 3 });
+const relationships = await project.relationships.list({ limit: 3 });
+
+const search = await project.search('beam connection', { limit: 5 });
+const answer = await project.query('What beams are called out on this sheet?');
 ```
 
 ## HTTP Endpoints (Reference)

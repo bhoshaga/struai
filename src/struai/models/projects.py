@@ -1,4 +1,5 @@
 """Tier 2: Project and Sheet models."""
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -12,7 +13,7 @@ class Project(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
     sheets_count: int = 0
     entities_count: int = 0
 
@@ -23,10 +24,10 @@ class Sheet(BaseModel):
     id: str
     title: Optional[str] = None
     name: Optional[str] = None
-    page: int
-    width: int
-    height: int
-    created_at: datetime
+    page: Optional[int] = None
+    width: Optional[float] = None
+    height: Optional[float] = None
+    created_at: Optional[datetime] = None
     entities_count: int = 0
 
 

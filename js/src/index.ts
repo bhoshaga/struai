@@ -97,7 +97,7 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
-  created_at: string;
+  created_at?: string | null;
   sheets_count: number;
   entities_count: number;
 }
@@ -105,9 +105,9 @@ export interface Project {
 export interface Sheet {
   id: string;
   title?: string;
-  page: number;
-  width: number;
-  height: number;
+  page?: number | null;
+  width?: number | null;
+  height?: number | null;
   created_at: string;
   entities_count: number;
 }

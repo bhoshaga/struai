@@ -34,6 +34,7 @@ Fast geometric detection. Returns annotations in ~1-2 seconds.
 # Analyze a PDF page
 result = client.drawings.analyze("structural.pdf", page=4)
 
+# The SDK auto-hashes + checks cache when you pass a file.
 # Or reuse cached PDFs by hash (skips upload)
 file_hash = client.drawings.compute_file_hash("structural.pdf")
 result = client.drawings.analyze(page=4, file_hash=file_hash)
@@ -122,6 +123,7 @@ project = client.projects.create(
 # Add sheets (async processing)
 job = project.sheets.add("structural.pdf", page=4)
 
+# The SDK auto-hashes + checks cache when you pass a file.
 # Or reuse cached PDFs by hash (skips upload)
 file_hash = client.drawings.compute_file_hash("structural.pdf")
 job = project.sheets.add(page=4, file_hash=file_hash)
@@ -150,6 +152,11 @@ print(f"Confidence: {answer.confidence:.0%}")
 entities = project.entities.list(type="Component", limit=50)
 entity = project.entities.get("ent_abc123")
 ```
+
+## Cookbook
+
+- `examples/test_prod_page12.py` — Tier 1 (page 12) quick run
+- `examples/test_prod_page12_full.py` — Tier 1 + Tier 2 full flow (projects, sheets, search, query, entities, relationships)
 
 ## Async Support
 

@@ -2,6 +2,16 @@
 
 <!-- version list -->
 
+## v1.2.1 (2026-02-04)
+
+### Documentation
+
+- **docs**: Add full page-12 cookbook example
+
+### Bug Fixes
+
+- **sdk**: Allow nullable sheet fields in list responses
+
 ## v1.2.0 (2026-02-04)
 
 ### Features
