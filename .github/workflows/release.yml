@@ -2,6 +2,15 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_only:
+        description: 'Just publish current version (skip version bump)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   push:
     branches: [main]
 
@@ -13,7 +22,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     concurrency: release
-    if: github.repository_owner == 'bhoshaga'
+    if: github.repository_owner == 'bhoshaga' && inputs.publish_only != 'true'
     outputs:
       released: ${{ steps.version.outputs.release }}
       version: ${{ steps.version.outputs.version }}
@@ -76,7 +85,7 @@ jobs:
 
   publish-python:
     needs: release
-    if: needs.release.outputs.released == 'true'
+    if: always() && (needs.release.outputs.released == 'true' || inputs.publish_only == 'true')
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -84,8 +93,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.release.outputs.version }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -105,7 +112,7 @@ jobs:
 
   publish-npm:
     needs: release
-    if: needs.release.outputs.released == 'true'
+    if: always() && (needs.release.outputs.released == 'true' || inputs.publish_only == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -113,8 +120,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.release.outputs.version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
