@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.1 (2026-02-04)
+
+### Bug Fixes
+
+- **sdk**: Send form data without files
+  ([`a2132e8`](https://github.com/bhoshaga/struai/commit/a2132e8b8923d24973f33351b785db1b7d3bb7f7))
+
+
 ## v1.1.0 (2026-02-04)
 
 ### Features
