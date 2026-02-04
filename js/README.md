@@ -16,6 +16,9 @@ npm install struai
 import { StruAI } from 'struai';
 
 const client = new StruAI({ apiKey: 'sk-xxx' });
+
+// Optional: override base URL (http://localhost:8000 or http://localhost:8000/v1)
+const local = new StruAI({ apiKey: 'sk-xxx', baseUrl: 'http://localhost:8000' });
 ```
 
 ## Tier 1: Raw Detection ($0.02/page)
@@ -59,6 +62,10 @@ for (const hit of results.results) {
 // Natural language query
 const answer = await project.query('What beams connect to column C3?');
 console.log(answer.answer);
+
+// Browse entities
+const entities = await project.entities.list({ type: 'Component', limit: 50 });
+const entity = await project.entities.get('ent_abc123');
 ```
 
 ## License

@@ -1,6 +1,7 @@
 """Base HTTP client with retry logic."""
 import time
 from typing import Any, Dict, Optional, Type, TypeVar, Union
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel
@@ -20,9 +21,22 @@ from ._version import __version__
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_BASE_URL = "https://api.stru.ai/v1"
+DEFAULT_BASE_URL = "https://api.stru.ai"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_RETRIES = 2
+
+
+def _normalize_base_url(base_url: str) -> str:
+    trimmed = base_url.rstrip("/")
+    parsed = urlparse(trimmed)
+    if parsed.scheme and parsed.netloc:
+        path = parsed.path.rstrip("/")
+        if path in ("", "/"):
+            return f"{trimmed}/v1"
+        return trimmed
+    if trimmed.endswith("/v1"):
+        return trimmed
+    return f"{trimmed}/v1"
 
 
 class BaseClient:
@@ -36,7 +50,7 @@ class BaseClient:
         max_retries: int = DEFAULT_MAX_RETRIES,
     ):
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _normalize_base_url(base_url)
         self.timeout = timeout
         self.max_retries = max_retries
         self._client: Optional[httpx.Client] = None
@@ -195,7 +209,7 @@ class AsyncBaseClient:
         max_retries: int = DEFAULT_MAX_RETRIES,
     ):
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _normalize_base_url(base_url)
         self.timeout = timeout
         self.max_retries = max_retries
         self._client: Optional[httpx.AsyncClient] = None

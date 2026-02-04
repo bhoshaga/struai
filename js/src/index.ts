@@ -163,7 +163,71 @@ export interface QueryResponse {
   confidence: number;
 }
 
-const DEFAULT_BASE_URL = 'https://api.stru.ai/v1';
+export interface EntityLocation {
+  sheet_id: string;
+  sheet_title?: string;
+  page?: number | null;
+}
+
+export interface EntityRelation {
+  uuid: string;
+  type: string;
+  fact: string;
+  source_id?: string;
+  source_label?: string;
+  target_id?: string;
+  target_label?: string;
+}
+
+export interface Fact {
+  id: string;
+  type: string;
+  fact: string;
+  source_id: string;
+  target_id: string;
+  source_label?: string;
+  target_label?: string;
+}
+
+export interface EntityListItem {
+  id: string;
+  type: string;
+  label: string;
+  description?: string;
+  sheet_id?: string;
+  bbox?: [number, number, number, number];
+  attributes?: string;
+}
+
+export interface Entity {
+  id: string;
+  type: string;
+  label: string;
+  description?: string;
+  outgoing: EntityRelation[];
+  incoming: EntityRelation[];
+  locations: EntityLocation[];
+}
+
+const DEFAULT_BASE_URL = 'https://api.stru.ai';
+
+function normalizeBaseUrl(raw: string): string {
+  const trimmed = raw.replace(/\/$/, '');
+  try {
+    const parsed = new URL(trimmed);
+    const path = parsed.pathname.replace(/\/$/, '');
+    if (path === '' || path === '/') {
+      parsed.pathname = '/v1';
+      return parsed.toString().replace(/\/$/, '');
+    }
+    return trimmed;
+  } catch {
+    if (trimmed.endsWith('/v1')) {
+      return trimmed;
+    }
+    return `${trimmed}/v1`;
+  }
+}
 
 class APIError extends Error {
   constructor(
@@ -284,14 +348,78 @@ class Sheets {
   }
 }
 
+class Entities {
+  constructor(
+    private client: StruAI,
+    private projectId: string
+  ) {}
+
+  async list(options?: {
+    sheetId?: string;
+    type?: string;
+    limit?: number;
+  }): Promise<EntityListItem[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.sheetId) params.set('sheet_id', options.sheetId);
+    if (options?.type) params.set('type', options.type);
+    const query = params.toString();
+
+    const response = await this.client.request<{ entities: EntityListItem[] }>(
+      query
+        ? `/projects/${this.projectId}/entities?${query}`
+        : `/projects/${this.projectId}/entities`
+    );
+    return response.entities;
+  }
+
+  async get(entityId: string): Promise<Entity> {
+    return this.client.request<Entity>(
+      `/projects/${this.projectId}/entities/${entityId}`
+    );
+  }
+}
+
+class Relationships {
+  constructor(
+    private client: StruAI,
+    private projectId: string
+  ) {}
+
+  async list(options?: {
+    sourceId?: string;
+    targetId?: string;
+    type?: string;
+    limit?: number;
+  }): Promise<Fact[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.sourceId) params.set('source_id', options.sourceId);
+    if (options?.targetId) params.set('target_id', options.targetId);
+    if (options?.type) params.set('type', options.type);
+    const query = params.toString();
+
+    const response = await this.client.request<{ relationships: Fact[] }>(
+      query
+        ? `/projects/${this.projectId}/relationships?${query}`
+        : `/projects/${this.projectId}/relationships`
+    );
+    return response.relationships;
+  }
+}
+
 class ProjectInstance {
   public readonly sheets: Sheets;
+  public readonly entities: Entities;
+  public readonly relationships: Relationships;
 
   constructor(
     private client: StruAI,
     private project: Project
   ) {
     this.sheets = new Sheets(client, project.id);
+    this.entities = new Entities(client, project.id);
+    this.relationships = new Relationships(client, project.id);
   }
 
   get id() {
@@ -378,7 +506,7 @@ export class StruAI {
 
   constructor(options: StruAIOptions) {
     this.apiKey = options.apiKey;
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeout = options.timeout ?? 60000;
 
     this.drawings = new Drawings(this);

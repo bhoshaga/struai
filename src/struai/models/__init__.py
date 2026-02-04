@@ -10,7 +10,7 @@ from .drawings import (
     SectionTag,
     TitleBlock,
 )
-from .entities import Entity, EntityLocation, Fact
+from .entities import Entity, EntityListItem, EntityLocation, EntityRelation, Fact
 from .projects import JobStatus, JobStep, Project, Sheet, SheetResult
 from .search import (
     EntitySummary,
@@ -55,6 +55,8 @@ __all__ = [
     "QuerySource",
     # Entities
     "Entity",
+    "EntityListItem",
     "EntityLocation",
+    "EntityRelation",
     "Fact",
 ]

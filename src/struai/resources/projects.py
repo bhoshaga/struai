@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, Dict, List, Optional, Union
 
 from .._exceptions import JobFailedError, TimeoutError
-from ..models.entities import Entity, Fact
+from ..models.entities import Entity, EntityListItem, Fact
 from ..models.projects import JobStatus, Project, Sheet, SheetResult
 from ..models.search import QueryResponse, SearchResponse
 
@@ -266,7 +266,7 @@ class Entities:
         sheet_id: Optional[str] = None,
         type: Optional[str] = None,
         limit: int = 100,
-    ) -> List[Entity]:
+    ) -> List[EntityListItem]:
         """List entities in project."""
         params: Dict[str, Union[str, int]] = {"limit": limit}
         if sheet_id:
@@ -278,7 +278,7 @@ class Entities:
             f"/projects/{self._project_id}/entities",
             params=params,
         )
-        return [Entity.model_validate(e) for e in response["entities"]]
+        return [EntityListItem.model_validate(e) for e in response["entities"]]
 
     def get(self, entity_id: str) -> Entity:
         """Get entity with all relationships."""
@@ -300,7 +300,7 @@ class AsyncEntities:
         sheet_id: Optional[str] = None,
         type: Optional[str] = None,
         limit: int = 100,
-    ) -> List[Entity]:
+    ) -> List[EntityListItem]:
         """List entities in project."""
         params: Dict[str, Union[str, int]] = {"limit": limit}
         if sheet_id:
@@ -312,7 +312,7 @@ class AsyncEntities:
             f"/projects/{self._project_id}/entities",
             params=params,
         )
-        return [Entity.model_validate(e) for e in response["entities"]]
+        return [EntityListItem.model_validate(e) for e in response["entities"]]
 
     async def get(self, entity_id: str) -> Entity:
         """Get entity with all relationships."""

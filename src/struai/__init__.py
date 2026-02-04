@@ -60,6 +60,8 @@ from .models import (
     QueryResponse,
     # Entities
     Entity,
+    EntityListItem,
+    EntityRelation,
     Fact,
 )
 
@@ -104,5 +106,7 @@ __all__ = [
     "SearchHit",
     "QueryResponse",
     "Entity",
+    "EntityListItem",
+    "EntityRelation",
     "Fact",
 ]

@@ -14,7 +14,8 @@ class StruAI(BaseClient):
 
     Args:
         api_key: Your API key. Falls back to STRUAI_API_KEY env var.
-        base_url: API base URL. Defaults to windowseat internal endpoint.
+        base_url: API base URL. Defaults to https://api.stru.ai.
+            If no path is provided, /v1 is appended automatically.
         timeout: Request timeout in seconds. Default 60.
         max_retries: Max retry attempts for failed requests. Default 2.
 

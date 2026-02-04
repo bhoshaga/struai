@@ -14,6 +14,9 @@ pip install struai
 from struai import StruAI
 
 client = StruAI(api_key="sk-xxx")  # or set STRUAI_API_KEY env var
+
+# Optional: override base URL (http://localhost:8000 or http://localhost:8000/v1)
+client = StruAI(api_key="sk-xxx", base_url="http://localhost:8000")
 ```
 
 ## Tier 1: Raw Detection ($0.02/page)

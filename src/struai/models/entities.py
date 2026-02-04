@@ -3,25 +3,51 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from .common import BBox
+
 
 class EntityLocation(BaseModel):
     """Where an entity appears."""
 
     sheet_id: str
     sheet_title: Optional[str] = None
-    page: int
+    page: Optional[int] = None
+
+
+class EntityRelation(BaseModel):
+    """Relationship entry on an entity detail response."""
+
+    uuid: str
+    type: str
+    fact: str
+    source_id: Optional[str] = None
+    source_label: Optional[str] = None
+    target_id: Optional[str] = None
+    target_label: Optional[str] = None
 
 
 class Fact(BaseModel):
-    """Relationship between entities."""
+    """Relationship between entities (list endpoint)."""
 
     id: str
+    type: str
     fact: str
-    edge_type: str
     source_id: str
-    source_label: Optional[str] = None
     target_id: str
+    source_label: Optional[str] = None
     target_label: Optional[str] = None
+
+
+class EntityListItem(BaseModel):
+    """Entity summary from list endpoint."""
+
+    id: str
+    type: str
+    label: str
+    description: Optional[str] = None
+    sheet_id: Optional[str] = None
+    bbox: Optional[BBox] = None
+    attributes: Optional[str] = None
 
 
 class Entity(BaseModel):
@@ -31,7 +57,6 @@ class Entity(BaseModel):
     type: str
     label: str
     description: Optional[str] = None
-    group_id: str
-    outgoing_facts: List[Fact] = []
-    incoming_facts: List[Fact] = []
+    outgoing: List[EntityRelation] = []
+    incoming: List[EntityRelation] = []
     locations: List[EntityLocation] = []
