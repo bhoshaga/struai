@@ -93,6 +93,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.released == 'true' && format('v{0}', needs.release.outputs.version) || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -120,6 +122,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.released == 'true' && format('v{0}', needs.release.outputs.version) || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
