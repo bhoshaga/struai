@@ -1,6 +1,6 @@
 """Main StruAI client classes."""
-import os
 from functools import cached_property
+import os
 from typing import Optional
 
 from ._base import AsyncBaseClient, BaseClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT

@@ -17,21 +17,21 @@ Example:
     >>> results = project.search("W12x26 beam connections")
 """
 
-from ._version import __version__
-from ._client import StruAI, AsyncStruAI
+from ._client import AsyncStruAI, StruAI
 from ._exceptions import (
-    StruAIError,
     APIError,
     AuthenticationError,
-    PermissionDeniedError,
-    NotFoundError,
-    ValidationError,
-    RateLimitError,
-    InternalServerError,
-    TimeoutError,
     ConnectionError,
+    InternalServerError,
     JobFailedError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+    StruAIError,
+    TimeoutError,
+    ValidationError,
 )
+from ._version import __version__
 
 # Re-export commonly used models
 from .models import (
