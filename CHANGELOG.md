@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.4 (2026-02-04)
+
+### Bug Fixes
+
+- **ci**: Checkout release tag for publish jobs
+  ([`6b78004`](https://github.com/bhoshaga/struai/commit/6b78004629cee3dff309836f7879da417dd69ac9))
+
+
 ## v1.0.3 (2026-02-04)
 
 ### Bug Fixes
