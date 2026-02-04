@@ -1,4 +1,5 @@
 """Base HTTP client with retry logic."""
+
 import time
 from typing import Any, Dict, Optional, Type, TypeVar, Union
 from urllib.parse import urlparse
@@ -138,10 +139,8 @@ class BaseClient:
 
         for attempt in range(self.max_retries + 1):
             try:
-                if files:
-                    response = client.request(
-                        method, path, data=data, files=files, params=params
-                    )
+                if files or data is not None:
+                    response = client.request(method, path, data=data, files=files, params=params)
                 else:
                     response = client.request(method, path, json=json, params=params)
 
@@ -299,14 +298,12 @@ class AsyncBaseClient:
 
         for attempt in range(self.max_retries + 1):
             try:
-                if files:
+                if files or data is not None:
                     response = await client.request(
                         method, path, data=data, files=files, params=params
                     )
                 else:
-                    response = await client.request(
-                        method, path, json=json, params=params
-                    )
+                    response = await client.request(method, path, json=json, params=params)
 
                 self._handle_response_error(response)
 
