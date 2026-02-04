@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-02-04)
+
+### Features
+
+- **sdk**: Auto cache check for drawings
+  ([`2a6c006`](https://github.com/bhoshaga/struai/commit/2a6c0062dcd4bc5efba94f472de5441d30ed5300))
+
+
 ## v1.0.4 (2026-02-04)
 
 ### Bug Fixes
