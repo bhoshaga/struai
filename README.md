@@ -10,13 +10,20 @@ pip install struai
 
 ## Quick Start
 
+Get an API key from `stru.ai` and set it as an environment variable:
+
+```bash
+export STRUAI_API_KEY="YOUR_API_KEY"
+```
+
 ```python
+import os
 from struai import StruAI
 
-client = StruAI(api_key="sk-xxx")  # or set STRUAI_API_KEY env var
+client = StruAI(api_key=os.environ["STRUAI_API_KEY"])
 
 # Optional: override base URL (http://localhost:8000 or http://localhost:8000/v1)
-client = StruAI(api_key="sk-xxx", base_url="http://localhost:8000")
+client = StruAI(api_key=os.environ["STRUAI_API_KEY"], base_url="http://localhost:8000")
 ```
 
 ## Tier 1: Raw Detection ($0.02/page)
@@ -42,6 +49,49 @@ for tag in result.annotations.section_tags:
 # Retrieve/delete previous results
 drawing = client.drawings.get("drw_7f8a9b2c")
 client.drawings.delete("drw_7f8a9b2c")
+```
+
+## HTTP Endpoints (Reference)
+
+All endpoints are under `/v1`. Use `Authorization: Bearer <API_KEY>`.
+
+Tier 1 (raw detection):
+- `POST /v1/drawings` — multipart form with `file` (PDF) and `page` (1-indexed)
+- `GET /v1/drawings/{id}`
+- `DELETE /v1/drawings/{id}`
+
+Tier 2 (graph + search):
+- `POST /v1/projects`
+- `GET /v1/projects`
+- `GET /v1/projects/{id}`
+- `DELETE /v1/projects/{id}`
+- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` + `page`
+- `GET /v1/projects/{project_id}/jobs/{job_id}`
+- `GET /v1/projects/{project_id}/sheets`
+- `GET /v1/projects/{project_id}/sheets/{sheet_id}`
+- `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
+- `POST /v1/projects/{project_id}/search`
+- `POST /v1/projects/{project_id}/query`
+- `GET /v1/projects/{project_id}/entities`
+- `GET /v1/projects/{project_id}/entities/{entity_id}`
+- `GET /v1/projects/{project_id}/relationships`
+
+Example (raw detection):
+
+```bash
+curl -X POST "https://api.stru.ai/v1/drawings" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@structural.pdf" \
+  -F "page=4"
+```
+
+Example (project sheet ingestion):
+
+```bash
+curl -X POST "https://api.stru.ai/v1/projects/{project_id}/sheets" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@structural.pdf" \
+  -F "page=4"
 ```
 
 ## Tier 2: Graph + Search ($0.15/page)
@@ -86,9 +136,10 @@ entity = project.entities.get("ent_abc123")
 ## Async Support
 
 ```python
+import os
 from struai import AsyncStruAI
 
-async with AsyncStruAI(api_key="sk-xxx") as client:
+async with AsyncStruAI(api_key=os.environ["STRUAI_API_KEY"]) as client:
     # Tier 1
     result = await client.drawings.analyze("structural.pdf", page=4)
 

@@ -1,9 +1,10 @@
 """StruAI Python SDK - Drawing Analysis API client.
 
 Example:
+    >>> import os
     >>> from struai import StruAI
     >>>
-    >>> client = StruAI(api_key="sk-xxx")
+    >>> client = StruAI(api_key=os.environ["STRUAI_API_KEY"])
     >>>
     >>> # Tier 1: Raw detection ($0.02/page)
     >>> result = client.drawings.analyze("plans.pdf", page=4)

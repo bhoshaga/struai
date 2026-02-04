@@ -21,7 +21,8 @@ class StruAI(BaseClient):
         max_retries: Max retry attempts for failed requests. Default 2.
 
     Example:
-        >>> client = StruAI(api_key="sk-xxx")
+        >>> import os
+        >>> client = StruAI(api_key=os.environ["STRUAI_API_KEY"])
         >>>
         >>> # Tier 1: Raw detection
         >>> result = client.drawings.analyze("structural.pdf", page=4)
@@ -72,7 +73,8 @@ class AsyncStruAI(AsyncBaseClient):
     """Async StruAI client for drawing analysis API.
 
     Example:
-        >>> async with AsyncStruAI(api_key="sk-xxx") as client:
+        >>> import os
+        >>> async with AsyncStruAI(api_key=os.environ["STRUAI_API_KEY"]) as client:
         ...     result = await client.drawings.analyze("structural.pdf", page=4)
         ...
         ...     project = await client.projects.create("Building A")

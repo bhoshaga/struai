@@ -5,7 +5,7 @@
  * ```typescript
  * import { StruAI } from 'struai';
  *
- * const client = new StruAI({ apiKey: 'sk-xxx' });
+ * const client = new StruAI({ apiKey: process.env.STRUAI_API_KEY });
  *
  * // Tier 1: Raw detection
  * const result = await client.drawings.analyze('structural.pdf', { page: 4 });

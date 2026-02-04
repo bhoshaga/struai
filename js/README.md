@@ -12,13 +12,16 @@ npm install struai
 
 ## Quick Start
 
+Get an API key from `stru.ai` and set `STRUAI_API_KEY`.
+
 ```typescript
 import { StruAI } from 'struai';
 
-const client = new StruAI({ apiKey: 'sk-xxx' });
+// Get an API key from stru.ai and set STRUAI_API_KEY
+const client = new StruAI({ apiKey: process.env.STRUAI_API_KEY! });
 
 // Optional: override base URL (http://localhost:8000 or http://localhost:8000/v1)
-const local = new StruAI({ apiKey: 'sk-xxx', baseUrl: 'http://localhost:8000' });
+const local = new StruAI({ apiKey: process.env.STRUAI_API_KEY!, baseUrl: 'http://localhost:8000' });
 ```
 
 ## Tier 1: Raw Detection ($0.02/page)
@@ -67,6 +70,31 @@ console.log(answer.answer);
 const entities = await project.entities.list({ type: 'Component', limit: 50 });
 const entity = await project.entities.get('ent_abc123');
 ```
+
+## HTTP Endpoints (Reference)
+
+All endpoints are under `/v1`. Use `Authorization: Bearer <API_KEY>`.
+
+Tier 1 (raw detection):
+- `POST /v1/drawings` — multipart form with `file` (PDF) and `page` (1-indexed)
+- `GET /v1/drawings/{id}`
+- `DELETE /v1/drawings/{id}`
+
+Tier 2 (graph + search):
+- `POST /v1/projects`
+- `GET /v1/projects`
+- `GET /v1/projects/{id}`
+- `DELETE /v1/projects/{id}`
+- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` + `page`
+- `GET /v1/projects/{project_id}/jobs/{job_id}`
+- `GET /v1/projects/{project_id}/sheets`
+- `GET /v1/projects/{project_id}/sheets/{sheet_id}`
+- `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
+- `POST /v1/projects/{project_id}/search`
+- `POST /v1/projects/{project_id}/query`
+- `GET /v1/projects/{project_id}/entities`
+- `GET /v1/projects/{project_id}/entities/{entity_id}`
+- `GET /v1/projects/{project_id}/relationships`
 
 ## License
 
