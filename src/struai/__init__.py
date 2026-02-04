@@ -35,34 +35,34 @@ from ._version import __version__
 
 # Re-export commonly used models
 from .models import (
-    # Common
-    Point,
+    Annotations,
     BBox,
-    TextSpan,
+    DetailTag,
     Dimensions,
     # Tier 1 - Drawings
     DrawingResult,
-    Annotations,
-    Leader,
-    SectionTag,
-    DetailTag,
-    RevisionTriangle,
-    RevisionCloud,
-    TitleBlock,
-    # Tier 2 - Projects
-    Project,
-    Sheet,
-    JobStatus,
-    SheetResult,
-    # Search
-    SearchResponse,
-    SearchHit,
-    QueryResponse,
     # Entities
     Entity,
     EntityListItem,
     EntityRelation,
     Fact,
+    JobStatus,
+    Leader,
+    # Common
+    Point,
+    # Tier 2 - Projects
+    Project,
+    QueryResponse,
+    RevisionCloud,
+    RevisionTriangle,
+    SearchHit,
+    # Search
+    SearchResponse,
+    SectionTag,
+    Sheet,
+    SheetResult,
+    TextSpan,
+    TitleBlock,
 )
 
 __all__ = [

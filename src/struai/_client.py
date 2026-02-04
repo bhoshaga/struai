@@ -1,9 +1,10 @@
 """Main StruAI client classes."""
-from functools import cached_property
+
 import os
+from functools import cached_property
 from typing import Optional
 
-from ._base import AsyncBaseClient, BaseClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
+from ._base import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, AsyncBaseClient, BaseClient
 from ._exceptions import StruAIError
 from .resources.drawings import AsyncDrawings, Drawings
 from .resources.projects import AsyncProjects, Projects
