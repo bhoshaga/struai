@@ -243,23 +243,6 @@ class APIError extends Error {
 class Drawings {
   constructor(private client: StruAI) {}
 
-  private async computeFileHash(file: Blob): Promise<string> {
-    const buffer = await file.arrayBuffer();
-
-    if (globalThis.crypto?.subtle) {
-      const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
-      return bufferToHex(digest).slice(0, 16);
-    }
-
-    try {
-      const crypto = await import('node:crypto');
-      const hash = crypto.createHash('sha256').update(Buffer.from(buffer)).digest('hex');
-      return hash.slice(0, 16);
-    } catch {
-      throw new Error('SHA-256 not available in this environment.');
-    }
-  }
-
   async analyze(
     file: File | Blob | null,
     options: { page: number; fileHash?: string }
@@ -267,16 +250,21 @@ class Drawings {
     const formData = new FormData();
 
     let fileHash = options.fileHash;
+    if (fileHash && file) {
+      throw new Error('Provide file or fileHash, not both.');
+    }
+
     if (!fileHash) {
       if (!file) {
         throw new Error('Provide file or fileHash.');
       }
-      fileHash = await this.computeFileHash(file);
+      const computedHash = await computeFileHashFromBlob(file);
       const cache = await this.client.request<{ cached: boolean }>(
-        `/drawings/cache/${fileHash}`
+        `/drawings/cache/${computedHash}`
       );
       if (cache.cached) {
         file = null;
+        fileHash = computedHash;
       }
     }
 
@@ -307,6 +295,23 @@ function bufferToHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+async function computeFileHashFromBlob(file: Blob): Promise<string> {
+  const buffer = await file.arrayBuffer();
+
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+    return bufferToHex(digest).slice(0, 16);
+  }
+
+  try {
+    const crypto = await import('node:crypto');
+    const hash = crypto.createHash('sha256').update(Buffer.from(buffer)).digest('hex');
+    return hash.slice(0, 16);
+  } catch {
+    throw new Error('SHA-256 not available in this environment.');
+  }
 }
 
 class Job {
@@ -348,11 +353,34 @@ class Sheets {
   ) {}
 
   async add(
-    file: File | Blob,
-    options: { page: number; webhookUrl?: string }
+    file: File | Blob | null,
+    options: { page: number; webhookUrl?: string; fileHash?: string }
   ): Promise<Job> {
     const formData = new FormData();
-    formData.append('file', file);
+    let fileHash = options.fileHash;
+    if (fileHash && file) {
+      throw new Error('Provide file or fileHash, not both.');
+    }
+    if (!fileHash) {
+      if (!file) {
+        throw new Error('Provide file or fileHash.');
+      }
+      const computedHash = await computeFileHashFromBlob(file);
+      const cache = await this.client.request<{ cached: boolean }>(
+        `/drawings/cache/${computedHash}`
+      );
+      if (cache.cached) {
+        file = null;
+        fileHash = computedHash;
+      }
+    }
+
+    if (fileHash) {
+      formData.append('file_hash', fileHash);
+    }
+    if (file) {
+      formData.append('file', file);
+    }
     formData.append('page', options.page.toString());
     if (options.webhookUrl) {
       formData.append('webhook_url', options.webhookUrl);

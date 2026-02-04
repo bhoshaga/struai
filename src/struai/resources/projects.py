@@ -1,4 +1,5 @@
 """Tier 2: Projects, Sheets, Search API."""
+
 import asyncio
 import time
 from functools import cached_property
@@ -9,6 +10,7 @@ from .._exceptions import JobFailedError, TimeoutError
 from ..models.entities import Entity, EntityListItem, Fact
 from ..models.projects import JobStatus, Project, Sheet, SheetResult
 from ..models.search import QueryResponse, SearchResponse
+from .drawings import _compute_file_hash
 
 if TYPE_CHECKING:
     from .._base import AsyncBaseClient, BaseClient
@@ -133,24 +135,44 @@ class Sheets:
 
     def add(
         self,
-        file: Union[str, Path, bytes, BinaryIO],
-        page: int,
+        file: Optional[Union[str, Path, bytes, BinaryIO]] = None,
+        page: int = 1,
         webhook_url: Optional[str] = None,
+        file_hash: Optional[str] = None,
     ) -> Job:
         """Add a sheet to the project (async job).
 
         Args:
-            file: PDF file
+            file: PDF file (omit if using file_hash)
             page: Page number (1-indexed)
             webhook_url: Optional callback URL when complete
+            file_hash: Cached file hash (optional, skips upload)
 
         Returns:
             Job handle for polling/waiting
         """
-        files = self._prepare_file(file)
+        if file is None and not file_hash:
+            raise ValueError("Provide file or file_hash")
+        if file is not None and file_hash:
+            raise ValueError("Provide either file or file_hash, not both")
+
+        if file is not None and file_hash is None:
+            computed_hash = _compute_file_hash(file)
+            try:
+                cache = self._client.get(f"/drawings/cache/{computed_hash}")
+                if cache.get("cached"):
+                    file = None
+                    file_hash = computed_hash
+            except Exception:
+                # Fail open: if cache check fails, proceed with upload
+                pass
+
+        files = self._prepare_file(file) if file is not None else None
         data: Dict[str, str] = {"page": str(page)}
         if webhook_url:
             data["webhook_url"] = webhook_url
+        if file_hash:
+            data["file_hash"] = file_hash
 
         response = self._client.post(
             f"/projects/{self._project_id}/sheets",
@@ -200,15 +222,33 @@ class AsyncSheets:
 
     async def add(
         self,
-        file: Union[str, Path, bytes, BinaryIO],
-        page: int,
+        file: Optional[Union[str, Path, bytes, BinaryIO]] = None,
+        page: int = 1,
         webhook_url: Optional[str] = None,
+        file_hash: Optional[str] = None,
     ) -> AsyncJob:
         """Add a sheet to the project (async job)."""
-        files = self._prepare_file(file)
+        if file is None and not file_hash:
+            raise ValueError("Provide file or file_hash")
+        if file is not None and file_hash:
+            raise ValueError("Provide either file or file_hash, not both")
+
+        if file is not None and file_hash is None:
+            computed_hash = _compute_file_hash(file)
+            try:
+                cache = await self._client.get(f"/drawings/cache/{computed_hash}")
+                if cache.get("cached"):
+                    file = None
+                    file_hash = computed_hash
+            except Exception:
+                pass
+
+        files = self._prepare_file(file) if file is not None else None
         data: Dict[str, str] = {"page": str(page)}
         if webhook_url:
             data["webhook_url"] = webhook_url
+        if file_hash:
+            data["file_hash"] = file_hash
 
         response = await self._client.post(
             f"/projects/{self._project_id}/sheets",

@@ -69,7 +69,7 @@ Tier 2 (graph + search):
 - `GET /v1/projects`
 - `GET /v1/projects/{id}`
 - `DELETE /v1/projects/{id}`
-- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` + `page`
+- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` **or** `file_hash`, plus `page`
 - `GET /v1/projects/{project_id}/jobs/{job_id}`
 - `GET /v1/projects/{project_id}/sheets`
 - `GET /v1/projects/{project_id}/sheets/{sheet_id}`
@@ -101,6 +101,11 @@ curl -X POST "https://api.stru.ai/v1/projects/{project_id}/sheets" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@structural.pdf" \
   -F "page=4"
+
+curl -X POST "https://api.stru.ai/v1/projects/{project_id}/sheets" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file_hash=abc123def4567890" \
+  -F "page=4"
 ```
 
 ## Tier 2: Graph + Search ($0.15/page)
@@ -116,6 +121,10 @@ project = client.projects.create(
 
 # Add sheets (async processing)
 job = project.sheets.add("structural.pdf", page=4)
+
+# Or reuse cached PDFs by hash (skips upload)
+file_hash = client.drawings.compute_file_hash("structural.pdf")
+job = project.sheets.add(page=4, file_hash=file_hash)
 result = job.wait(timeout=120)  # Blocks until complete
 print(f"Created {result.entities_created} entities")
 

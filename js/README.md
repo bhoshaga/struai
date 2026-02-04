@@ -52,6 +52,9 @@ const project = await client.projects.create({
 
 // Add sheet (async processing)
 const job = await project.sheets.add(file, { page: 4 });
+
+// Or reuse cached PDFs by hash (skips upload)
+const cachedJob = await project.sheets.add(null, { page: 4, fileHash: "abc123def4567890" });
 const result = await job.wait({ timeout: 120000 });
 console.log(`Created ${result.entities_created} entities`);
 
@@ -88,7 +91,7 @@ Tier 2 (graph + search):
 - `GET /v1/projects`
 - `GET /v1/projects/{id}`
 - `DELETE /v1/projects/{id}`
-- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` + `page`
+- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` **or** `file_hash`, plus `page`
 - `GET /v1/projects/{project_id}/jobs/{job_id}`
 - `GET /v1/projects/{project_id}/sheets`
 - `GET /v1/projects/{project_id}/sheets/{sheet_id}`
