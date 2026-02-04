@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    concurrency: release
+    if: github.repository_owner == 'bhoshaga'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install python-semantic-release
+        run: pip install python-semantic-release
+
+      - name: Get next version
+        id: version
+        run: |
+          # Get the next version without making changes
+          NEXT_VERSION=$(semantic-release version --print 2>/dev/null || echo "")
+          if [ -z "$NEXT_VERSION" ]; then
+            echo "No release needed"
+            echo "release=false" >> $GITHUB_OUTPUT
+          else
+            echo "Next version: $NEXT_VERSION"
+            echo "release=true" >> $GITHUB_OUTPUT
+            echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update npm package version
+        if: steps.version.outputs.release == 'true'
+        run: |
+          cd js
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      - name: Python Semantic Release
+        if: steps.version.outputs.release == 'true'
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Add the npm package.json change
+          git add js/package.json
+
+          # Run semantic-release (will update Python version, commit, tag, and create release)
+          semantic-release version
+
+          # Push changes and tags
+          git push origin main --follow-tags

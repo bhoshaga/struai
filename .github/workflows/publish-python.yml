@@ -2,12 +2,6 @@ name: Publish Python Package
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'pyproject.toml'
-      - '.github/workflows/publish-python.yml'
   release:
     types: [published]
 
@@ -37,7 +31,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     environment: pypi
     permissions:
       id-token: write

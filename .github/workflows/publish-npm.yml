@@ -2,11 +2,6 @@ name: Publish npm Package
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'js/**'
-      - '.github/workflows/publish-npm.yml'
   release:
     types: [published]
 
@@ -40,7 +35,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     defaults:
       run:
         working-directory: js
