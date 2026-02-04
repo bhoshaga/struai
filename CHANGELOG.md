@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.2 (2026-02-04)
+
+### Bug Fixes
+
+- **ci**: Add publish_only option for re-publishing
+  ([`0806b1e`](https://github.com/bhoshaga/struai/commit/0806b1eb6dba6d518df9f43a199b9255d1776d6a))
+
+- **ci**: Consolidate to single release workflow
+  ([`91e94b0`](https://github.com/bhoshaga/struai/commit/91e94b00f5eb6e123adb2cfae01a473ed4cd5cbd))
+
+
 ## v1.0.1 (2026-02-04)
 
 ### Bug Fixes
