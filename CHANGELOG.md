@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.0.3 (2026-02-04)
+
+### Bug Fixes
+
+- Trigger release v1.0.3
+  ([`a611906`](https://github.com/bhoshaga/struai/commit/a611906590f693d9222b2b95aa2c42830e92c156))
+
+### Documentation
+
+- Clarify auth and endpoints
+  ([`9703efe`](https://github.com/bhoshaga/struai/commit/9703efe1354168cb32d3ed6eacea642e22bea593))
+
+
 ## v1.0.2 (2026-02-04)
 
 ### Bug Fixes
