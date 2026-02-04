@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-02-04)
+
+### Features
+
+- **sdk**: Cache reuse for tier2 sheets
+  ([`2e43eb1`](https://github.com/bhoshaga/struai/commit/2e43eb146e76d1cf8982caa894f66ab3c7b20733))
+
+
 ## v1.1.1 (2026-02-04)
 
 ### Bug Fixes
