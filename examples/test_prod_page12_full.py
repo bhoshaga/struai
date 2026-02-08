@@ -4,12 +4,19 @@ import time
 from pathlib import Path
 
 from struai import StruAI
+from struai.resources.projects import JobBatch
 
 PDF_PATH = Path(
     "/Users/bhoshaga/PycharmProjects/windowseat/drawing_research/sample-pdf/structural-compiled.pdf"
 )
 PAGE = 12
 BASE_URL = os.environ.get("STRUAI_BASE_URL", "https://api.stru.ai")
+
+
+def _wait_ingest(result_or_batch):
+    if isinstance(result_or_batch, JobBatch):
+        return result_or_batch.wait_all(timeout_per_job=180)[0]
+    return result_or_batch.wait(timeout=180)
 
 
 def main() -> int:
@@ -53,10 +60,8 @@ def main() -> int:
     projects = client.projects.list(limit=3)
     print(f"projects_list_count={len(projects)}")
 
-    job = project.sheets.add(page=PAGE, file_hash=file_hash)
-    status = job.status()
-    print(f"job_id={job.id} status={status.status}")
-    sheet_result = job.wait(timeout=180)
+    ingest = project.sheets.add(page=PAGE, file_hash=file_hash)
+    sheet_result = _wait_ingest(ingest)
     print(
         f"sheet_id={sheet_result.sheet_id} "
         f"entities_created={sheet_result.entities_created} "
@@ -68,23 +73,31 @@ def main() -> int:
     sheet = project.sheets.get(sheet_result.sheet_id)
     print(f"sheet_get_id={sheet.id} page={sheet.page}")
 
+    raw = project.sheets.get_annotations(sheet_result.sheet_id)
+    print(f"sheet_annotations_leaders={len(raw.annotations.get('leaders', []))}")
+
     search = project.search(
         query="beam connection",
         limit=5,
         include_graph_context=True,
     )
-    print(f"search_results={len(search.results)} search_ms={search.search_ms}")
-    if search.results:
-        top = search.results[0]
-        print(f"search_top={top.entity.label} score={top.score}")
-
-    answer = project.query("What beams are called out on this sheet?")
-    print(f"query_answer={answer.answer} confidence={answer.confidence}")
+    print(
+        "search_entities="
+        f"{len(search.entities)} "
+        "facts="
+        f"{len(search.facts)} "
+        "communities="
+        f"{len(search.communities)} "
+        f"search_ms={search.search_ms}"
+    )
+    if search.entities:
+        top = search.entities[0]
+        print(f"search_top={top.label} score={top.score}")
 
     entities = project.entities.list(limit=3)
     print(f"entities_list_count={len(entities)}")
     if entities:
-        entity = project.entities.get(entities[0].id)
+        entity = project.entities.get(entities[0].id, expand_target=True)
         print(f"entity_get_id={entity.id} label={entity.label}")
 
     relationships = project.relationships.list(limit=3)

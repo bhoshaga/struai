@@ -1,35 +1,44 @@
-"""Common types shared across models."""
-from typing import Tuple
+"""Common types shared across SDK models."""
 
-from pydantic import BaseModel
+from __future__ import annotations
 
-# Coordinate types
-Point = Tuple[float, float]  # [x, y]
-BBox = Tuple[float, float, float, float]  # [x1, y1, x2, y2]
+from typing import Dict, List, Tuple, Union
+
+from pydantic import BaseModel, ConfigDict
+
+Point = Tuple[float, float]
+BBox = Tuple[float, float, float, float]
+JSONValue = Union[str, int, float, bool, None, Dict[str, "JSONValue"], List["JSONValue"]]
 
 
-class TextSpan(BaseModel):
+class SDKBaseModel(BaseModel):
+    """Base model that tolerates forward-compatible extra fields."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class TextSpan(SDKBaseModel):
     """Text detected inside an annotation."""
 
-    id: int
-    text: str
+    id: Union[int, str, None] = None
+    text: str = ""
 
 
-class Dimensions(BaseModel):
-    """Page dimensions in pixels."""
+class Dimensions(SDKBaseModel):
+    """Page dimensions in fitz coordinate space."""
 
-    width: int
-    height: int
+    width: float = 0.0
+    height: float = 0.0
 
 
-class Circle(BaseModel):
+class Circle(SDKBaseModel):
     """Circle geometry."""
 
     center: Point
     radius: float
 
 
-class Line(BaseModel):
+class Line(SDKBaseModel):
     """Line segment."""
 
     start: Point

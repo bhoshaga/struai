@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-02-08)
+
+### Features
+
+- **sdk**: Rebuild Python/JS SDK contracts for full projects API surface
+- **sdk**: Add multi-job sheet ingest support (`page` selectors + batch wait helpers)
+- **sdk**: Add sheet annotations endpoint support
+
+### Documentation
+
+- **docs**: Refresh README/examples for current drawings + projects APIs
+
 ## v1.2.1 (2026-02-04)
 
 ### Documentation

@@ -1,133 +1,241 @@
-"""Tier 2: Projects, Sheets, Search API."""
+"""Tier 2 projects resource."""
+
+from __future__ import annotations
 
 import asyncio
 import time
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO, Dict, List, Optional, Tuple, Union
 
 from .._exceptions import JobFailedError, TimeoutError
 from ..models.entities import Entity, EntityListItem, Fact
-from ..models.projects import JobStatus, Project, Sheet, SheetResult
-from ..models.search import QueryResponse, SearchResponse
+from ..models.projects import (
+    JobStatus,
+    Project,
+    ProjectDeleteResult,
+    SheetAnnotations,
+    SheetDeleteResult,
+    SheetDetail,
+    SheetIngestResponse,
+    SheetResult,
+    SheetSummary,
+)
+from ..models.search import SearchResponse
 from .drawings import _compute_file_hash
 
 if TYPE_CHECKING:
     from .._base import AsyncBaseClient, BaseClient
 
+Uploadable = Union[str, Path, bytes, BinaryIO]
+PreparedUpload = Tuple[dict, Optional[BinaryIO]]
+
 
 # =============================================================================
-# Job handles for async sheet ingestion
+# Job handles
 # =============================================================================
 
 
 class Job:
-    """Handle for an async sheet ingestion job (sync)."""
+    """Handle for one async sheet-ingestion job (sync)."""
 
-    def __init__(self, client: "BaseClient", project_id: str, job_id: str):
+    def __init__(
+        self,
+        client: "BaseClient",
+        project_id: str,
+        job_id: str,
+        page: Optional[int] = None,
+    ):
         self._client = client
         self._project_id = project_id
         self._job_id = job_id
+        self._page = page
 
     @property
     def id(self) -> str:
         return self._job_id
 
+    @property
+    def page(self) -> Optional[int]:
+        return self._page
+
     def status(self) -> JobStatus:
-        """Check current job status."""
+        """Fetch current job status."""
         return self._client.get(
             f"/projects/{self._project_id}/jobs/{self._job_id}",
             cast_to=JobStatus,
         )
 
-    def wait(
-        self,
-        timeout: float = 120,
-        poll_interval: float = 2,
-    ) -> SheetResult:
-        """Wait for job completion.
-
-        Args:
-            timeout: Maximum seconds to wait
-            poll_interval: Seconds between status checks
-
-        Returns:
-            SheetResult on success
-
-        Raises:
-            TimeoutError: If job doesn't complete in time
-            JobFailedError: If job fails
-        """
+    def wait(self, timeout: float = 120, poll_interval: float = 2) -> SheetResult:
+        """Wait for completion and return resulting sheet info."""
         start = time.time()
         while time.time() - start < timeout:
             status = self.status()
-
             if status.is_complete:
-                return status.result  # type: ignore
-
+                if status.result is None:
+                    return SheetResult()
+                return status.result
             if status.is_failed:
                 raise JobFailedError(
                     f"Job {self._job_id} failed: {status.error}",
                     job_id=self._job_id,
                     error=status.error or "Unknown error",
                 )
-
             time.sleep(poll_interval)
 
         raise TimeoutError(f"Job {self._job_id} did not complete within {timeout}s")
 
 
 class AsyncJob:
-    """Handle for an async sheet ingestion job (async)."""
+    """Handle for one async sheet-ingestion job (async)."""
 
-    def __init__(self, client: "AsyncBaseClient", project_id: str, job_id: str):
+    def __init__(
+        self,
+        client: "AsyncBaseClient",
+        project_id: str,
+        job_id: str,
+        page: Optional[int] = None,
+    ):
         self._client = client
         self._project_id = project_id
         self._job_id = job_id
+        self._page = page
 
     @property
     def id(self) -> str:
         return self._job_id
 
+    @property
+    def page(self) -> Optional[int]:
+        return self._page
+
     async def status(self) -> JobStatus:
-        """Check current job status."""
+        """Fetch current job status."""
         return await self._client.get(
             f"/projects/{self._project_id}/jobs/{self._job_id}",
             cast_to=JobStatus,
         )
 
-    async def wait(
-        self,
-        timeout: float = 120,
-        poll_interval: float = 2,
-    ) -> SheetResult:
-        """Wait for job completion (async)."""
+    async def wait(self, timeout: float = 120, poll_interval: float = 2) -> SheetResult:
+        """Wait for completion and return resulting sheet info."""
         start = time.time()
         while time.time() - start < timeout:
             status = await self.status()
-
             if status.is_complete:
-                return status.result  # type: ignore
-
+                if status.result is None:
+                    return SheetResult()
+                return status.result
             if status.is_failed:
                 raise JobFailedError(
                     f"Job {self._job_id} failed: {status.error}",
                     job_id=self._job_id,
                     error=status.error or "Unknown error",
                 )
-
             await asyncio.sleep(poll_interval)
 
         raise TimeoutError(f"Job {self._job_id} did not complete within {timeout}s")
 
 
+class JobBatch:
+    """Batch of jobs returned by a multi-page sheet ingest request (sync)."""
+
+    def __init__(self, jobs: List[Job]):
+        self.jobs = jobs
+
+    @property
+    def ids(self) -> List[str]:
+        return [job.id for job in self.jobs]
+
+    def status_all(self) -> List[JobStatus]:
+        return [job.status() for job in self.jobs]
+
+    def wait_all(
+        self,
+        timeout_per_job: float = 120,
+        poll_interval: float = 2,
+    ) -> List[SheetResult]:
+        return [job.wait(timeout=timeout_per_job, poll_interval=poll_interval) for job in self.jobs]
+
+
+class AsyncJobBatch:
+    """Batch of jobs returned by a multi-page sheet ingest request (async)."""
+
+    def __init__(self, jobs: List[AsyncJob]):
+        self.jobs = jobs
+
+    @property
+    def ids(self) -> List[str]:
+        return [job.id for job in self.jobs]
+
+    async def status_all(self) -> List[JobStatus]:
+        return [await job.status() for job in self.jobs]
+
+    async def wait_all(
+        self,
+        timeout_per_job: float = 120,
+        poll_interval: float = 2,
+    ) -> List[SheetResult]:
+        return [
+            await job.wait(timeout=timeout_per_job, poll_interval=poll_interval)
+            for job in self.jobs
+        ]
+
+
 # =============================================================================
-# Sheets resource
+# Helpers
+# =============================================================================
+
+
+def _normalize_page_selector(page: Union[int, str]) -> str:
+    if isinstance(page, int):
+        return str(page)
+    text = str(page).strip()
+    if not text:
+        raise ValueError("page is required")
+    return text
+
+
+def _prepare_file(file: Uploadable) -> PreparedUpload:
+    if isinstance(file, (str, Path)):
+        path = Path(file)
+        handle = open(path, "rb")
+        return {"file": (path.name, handle, "application/pdf")}, handle
+    if isinstance(file, bytes):
+        return {"file": ("document.pdf", file, "application/pdf")}, None
+
+    name = getattr(file, "name", "document.pdf")
+    if hasattr(name, "split"):
+        name = Path(name).name
+    return {"file": (name, file, "application/pdf")}, None
+
+
+def _jobs_from_response(
+    client: "BaseClient",
+    project_id: str,
+    payload: SheetIngestResponse,
+) -> List[Job]:
+    jobs: List[Job] = []
+    for item in payload.jobs:
+        jobs.append(Job(client, project_id, item.job_id, page=item.page))
+    return jobs
+
+
+def _async_jobs_from_response(
+    client: "AsyncBaseClient", project_id: str, payload: SheetIngestResponse
+) -> List[AsyncJob]:
+    jobs: List[AsyncJob] = []
+    for item in payload.jobs:
+        jobs.append(AsyncJob(client, project_id, item.job_id, page=item.page))
+    return jobs
+
+
+# =============================================================================
+# Sheets
 # =============================================================================
 
 
 class Sheets:
-    """Sheet ingestion API (sync)."""
+    """Sheet ingestion and retrieval API (sync)."""
 
     def __init__(self, client: "BaseClient", project_id: str):
         self._client = client
@@ -135,21 +243,28 @@ class Sheets:
 
     def add(
         self,
-        file: Optional[Union[str, Path, bytes, BinaryIO]] = None,
-        page: int = 1,
-        webhook_url: Optional[str] = None,
+        file: Optional[Uploadable] = None,
+        *,
+        page: Union[int, str] = 1,
         file_hash: Optional[str] = None,
-    ) -> Job:
-        """Add a sheet to the project (async job).
+        source_description: Optional[str] = None,
+        on_sheet_exists: Optional[str] = None,
+        community_update_mode: Optional[str] = None,
+        semantic_index_update_mode: Optional[str] = None,
+    ) -> Union[Job, JobBatch]:
+        """Queue sheet ingestion jobs.
 
         Args:
-            file: PDF file (omit if using file_hash)
-            page: Page number (1-indexed)
-            webhook_url: Optional callback URL when complete
-            file_hash: Cached file hash (optional, skips upload)
+            file: PDF upload (omit when using file_hash)
+            page: page selector (e.g. `12`, `"1,3,5-7"`, `"all"`)
+            file_hash: cached PDF hash
+            source_description: optional source descriptor stored with the job
+            on_sheet_exists: one of `error|skip|rebuild`
+            community_update_mode: one of `incremental|rebuild`
+            semantic_index_update_mode: one of `incremental|rebuild`
 
         Returns:
-            Job handle for polling/waiting
+            `Job` for single-page selectors or `JobBatch` for multi-page selectors.
         """
         if file is None and not file_hash:
             raise ValueError("Provide file or file_hash")
@@ -164,57 +279,72 @@ class Sheets:
                     file = None
                     file_hash = computed_hash
             except Exception:
-                # Fail open: if cache check fails, proceed with upload
                 pass
 
-        files = self._prepare_file(file) if file is not None else None
-        data: Dict[str, str] = {"page": str(page)}
-        if webhook_url:
-            data["webhook_url"] = webhook_url
+        selector = _normalize_page_selector(page)
+        data: Dict[str, str] = {"page": selector}
         if file_hash:
             data["file_hash"] = file_hash
+        if source_description is not None:
+            data["source_description"] = source_description
+        if on_sheet_exists:
+            data["on_sheet_exists"] = on_sheet_exists
+        if community_update_mode:
+            data["community_update_mode"] = community_update_mode
+        if semantic_index_update_mode:
+            data["semantic_index_update_mode"] = semantic_index_update_mode
 
-        response = self._client.post(
-            f"/projects/{self._project_id}/sheets",
-            files=files,
-            data=data,
-        )
-        return Job(self._client, self._project_id, response["job_id"])
+        upload = None
+        handle = None
+        try:
+            if file is not None:
+                upload, handle = _prepare_file(file)
 
-    def list(self, limit: int = 100) -> List[Sheet]:
-        """List all sheets in project."""
-        response = self._client.get(
-            f"/projects/{self._project_id}/sheets",
-            params={"limit": limit},
-        )
-        return [Sheet.model_validate(s) for s in response["sheets"]]
+            response = self._client.post(
+                f"/projects/{self._project_id}/sheets",
+                files=upload,
+                data=data,
+                cast_to=SheetIngestResponse,
+            )
+        finally:
+            if handle is not None:
+                handle.close()
 
-    def get(self, sheet_id: str) -> Sheet:
-        """Get a sheet by ID."""
+        jobs = _jobs_from_response(self._client, self._project_id, response)
+        if len(jobs) == 1:
+            return jobs[0]
+        return JobBatch(jobs)
+
+    def list(self, limit: Optional[int] = None) -> List[SheetSummary]:
+        """List sheets in the project."""
+        params = {"limit": limit} if limit is not None else None
+        response = self._client.get(f"/projects/{self._project_id}/sheets", params=params)
+        return [SheetSummary.model_validate(item) for item in response.get("sheets", [])]
+
+    def get(self, sheet_id: str) -> SheetDetail:
+        """Fetch sheet details."""
         return self._client.get(
             f"/projects/{self._project_id}/sheets/{sheet_id}",
-            cast_to=Sheet,
+            cast_to=SheetDetail,
         )
 
-    def delete(self, sheet_id: str) -> None:
-        """Remove a sheet from the project."""
-        self._client.delete(f"/projects/{self._project_id}/sheets/{sheet_id}")
+    def get_annotations(self, sheet_id: str) -> SheetAnnotations:
+        """Fetch raw annotations for one sheet."""
+        return self._client.get(
+            f"/projects/{self._project_id}/sheets/{sheet_id}/annotations",
+            cast_to=SheetAnnotations,
+        )
 
-    def _prepare_file(self, file: Union[str, Path, bytes, BinaryIO]) -> dict:
-        if isinstance(file, (str, Path)):
-            path = Path(file)
-            return {"file": (path.name, open(path, "rb"), "application/pdf")}
-        elif isinstance(file, bytes):
-            return {"file": ("document.pdf", file, "application/pdf")}
-        else:
-            name = getattr(file, "name", "document.pdf")
-            if hasattr(name, "split"):
-                name = Path(name).name
-            return {"file": (name, file, "application/pdf")}
+    def delete(self, sheet_id: str) -> SheetDeleteResult:
+        """Delete a sheet and return cleanup stats."""
+        return self._client.delete(
+            f"/projects/{self._project_id}/sheets/{sheet_id}",
+            cast_to=SheetDeleteResult,
+        )
 
 
 class AsyncSheets:
-    """Sheet ingestion API (async)."""
+    """Sheet ingestion and retrieval API (async)."""
 
     def __init__(self, client: "AsyncBaseClient", project_id: str):
         self._client = client
@@ -222,12 +352,16 @@ class AsyncSheets:
 
     async def add(
         self,
-        file: Optional[Union[str, Path, bytes, BinaryIO]] = None,
-        page: int = 1,
-        webhook_url: Optional[str] = None,
+        file: Optional[Uploadable] = None,
+        *,
+        page: Union[int, str] = 1,
         file_hash: Optional[str] = None,
-    ) -> AsyncJob:
-        """Add a sheet to the project (async job)."""
+        source_description: Optional[str] = None,
+        on_sheet_exists: Optional[str] = None,
+        community_update_mode: Optional[str] = None,
+        semantic_index_update_mode: Optional[str] = None,
+    ) -> Union[AsyncJob, AsyncJobBatch]:
+        """Queue sheet ingestion jobs."""
         if file is None and not file_hash:
             raise ValueError("Provide file or file_hash")
         if file is not None and file_hash:
@@ -243,54 +377,69 @@ class AsyncSheets:
             except Exception:
                 pass
 
-        files = self._prepare_file(file) if file is not None else None
-        data: Dict[str, str] = {"page": str(page)}
-        if webhook_url:
-            data["webhook_url"] = webhook_url
+        selector = _normalize_page_selector(page)
+        data: Dict[str, str] = {"page": selector}
         if file_hash:
             data["file_hash"] = file_hash
+        if source_description is not None:
+            data["source_description"] = source_description
+        if on_sheet_exists:
+            data["on_sheet_exists"] = on_sheet_exists
+        if community_update_mode:
+            data["community_update_mode"] = community_update_mode
+        if semantic_index_update_mode:
+            data["semantic_index_update_mode"] = semantic_index_update_mode
 
-        response = await self._client.post(
-            f"/projects/{self._project_id}/sheets",
-            files=files,
-            data=data,
-        )
-        return AsyncJob(self._client, self._project_id, response["job_id"])
+        upload = None
+        handle = None
+        try:
+            if file is not None:
+                upload, handle = _prepare_file(file)
+            response = await self._client.post(
+                f"/projects/{self._project_id}/sheets",
+                files=upload,
+                data=data,
+                cast_to=SheetIngestResponse,
+            )
+        finally:
+            if handle is not None:
+                handle.close()
 
-    async def list(self, limit: int = 100) -> List[Sheet]:
-        """List all sheets in project."""
-        response = await self._client.get(
-            f"/projects/{self._project_id}/sheets",
-            params={"limit": limit},
-        )
-        return [Sheet.model_validate(s) for s in response["sheets"]]
+        jobs = _async_jobs_from_response(self._client, self._project_id, response)
+        if len(jobs) == 1:
+            return jobs[0]
+        return AsyncJobBatch(jobs)
 
-    async def get(self, sheet_id: str) -> Sheet:
-        """Get a sheet by ID."""
+    async def list(self, limit: Optional[int] = None) -> List[SheetSummary]:
+        """List sheets in the project."""
+        params = {"limit": limit} if limit is not None else None
+        response = await self._client.get(f"/projects/{self._project_id}/sheets", params=params)
+        return [SheetSummary.model_validate(item) for item in response.get("sheets", [])]
+
+    async def get(self, sheet_id: str) -> SheetDetail:
+        """Fetch sheet details."""
         return await self._client.get(
             f"/projects/{self._project_id}/sheets/{sheet_id}",
-            cast_to=Sheet,
+            cast_to=SheetDetail,
         )
 
-    async def delete(self, sheet_id: str) -> None:
-        """Remove a sheet from the project."""
-        await self._client.delete(f"/projects/{self._project_id}/sheets/{sheet_id}")
+    async def get_annotations(self, sheet_id: str) -> SheetAnnotations:
+        """Fetch raw annotations for one sheet."""
+        return await self._client.get(
+            f"/projects/{self._project_id}/sheets/{sheet_id}/annotations",
+            cast_to=SheetAnnotations,
+        )
 
-    def _prepare_file(self, file: Union[str, Path, bytes, BinaryIO]) -> dict:
-        if isinstance(file, (str, Path)):
-            path = Path(file)
-            return {"file": (path.name, open(path, "rb"), "application/pdf")}
-        elif isinstance(file, bytes):
-            return {"file": ("document.pdf", file, "application/pdf")}
-        else:
-            name = getattr(file, "name", "document.pdf")
-            if hasattr(name, "split"):
-                name = Path(name).name
-            return {"file": (name, file, "application/pdf")}
+    async def delete(self, sheet_id: str) -> SheetDeleteResult:
+        """Delete a sheet and return cleanup stats."""
+        return await self._client.delete(
+            f"/projects/{self._project_id}/sheets/{sheet_id}",
+            cast_to=SheetDeleteResult,
+        )
 
 
 # =============================================================================
-# Entities resource
+# Entities
 # =============================================================================
 
 
@@ -303,27 +452,54 @@ class Entities:
 
     def list(
         self,
+        *,
         sheet_id: Optional[str] = None,
         type: Optional[str] = None,
-        limit: int = 100,
+        family: Optional[str] = None,
+        normalized_spec: Optional[str] = None,
+        region_uuid: Optional[str] = None,
+        region_label: Optional[str] = None,
+        note_number: Optional[str] = None,
+        limit: int = 200,
     ) -> List[EntityListItem]:
-        """List entities in project."""
+        """List entities with optional filters."""
         params: Dict[str, Union[str, int]] = {"limit": limit}
         if sheet_id:
             params["sheet_id"] = sheet_id
         if type:
             params["type"] = type
+        if family:
+            params["family"] = family
+        if normalized_spec:
+            params["normalized_spec"] = normalized_spec
+        if region_uuid:
+            params["region_uuid"] = region_uuid
+        if region_label:
+            params["region_label"] = region_label
+        if note_number:
+            params["note_number"] = note_number
 
         response = self._client.get(
             f"/projects/{self._project_id}/entities",
             params=params,
         )
-        return [EntityListItem.model_validate(e) for e in response["entities"]]
+        return [EntityListItem.model_validate(item) for item in response.get("entities", [])]
 
-    def get(self, entity_id: str) -> Entity:
-        """Get entity with all relationships."""
+    def get(
+        self,
+        entity_id: str,
+        *,
+        include_invalid: bool = False,
+        expand_target: bool = False,
+    ) -> Entity:
+        """Get one entity with full relation context."""
+        params: Dict[str, Union[str, bool]] = {
+            "include_invalid": include_invalid,
+            "expand_target": expand_target,
+        }
         return self._client.get(
             f"/projects/{self._project_id}/entities/{entity_id}",
+            params=params,
             cast_to=Entity,
         )
 
@@ -337,33 +513,60 @@ class AsyncEntities:
 
     async def list(
         self,
+        *,
         sheet_id: Optional[str] = None,
         type: Optional[str] = None,
-        limit: int = 100,
+        family: Optional[str] = None,
+        normalized_spec: Optional[str] = None,
+        region_uuid: Optional[str] = None,
+        region_label: Optional[str] = None,
+        note_number: Optional[str] = None,
+        limit: int = 200,
     ) -> List[EntityListItem]:
-        """List entities in project."""
+        """List entities with optional filters."""
         params: Dict[str, Union[str, int]] = {"limit": limit}
         if sheet_id:
             params["sheet_id"] = sheet_id
         if type:
             params["type"] = type
+        if family:
+            params["family"] = family
+        if normalized_spec:
+            params["normalized_spec"] = normalized_spec
+        if region_uuid:
+            params["region_uuid"] = region_uuid
+        if region_label:
+            params["region_label"] = region_label
+        if note_number:
+            params["note_number"] = note_number
 
         response = await self._client.get(
             f"/projects/{self._project_id}/entities",
             params=params,
         )
-        return [EntityListItem.model_validate(e) for e in response["entities"]]
+        return [EntityListItem.model_validate(item) for item in response.get("entities", [])]
 
-    async def get(self, entity_id: str) -> Entity:
-        """Get entity with all relationships."""
+    async def get(
+        self,
+        entity_id: str,
+        *,
+        include_invalid: bool = False,
+        expand_target: bool = False,
+    ) -> Entity:
+        """Get one entity with full relation context."""
+        params: Dict[str, Union[str, bool]] = {
+            "include_invalid": include_invalid,
+            "expand_target": expand_target,
+        }
         return await self._client.get(
             f"/projects/{self._project_id}/entities/{entity_id}",
+            params=params,
             cast_to=Entity,
         )
 
 
 # =============================================================================
-# Relationships resource
+# Relationships
 # =============================================================================
 
 
@@ -376,13 +579,25 @@ class Relationships:
 
     def list(
         self,
+        *,
+        sheet_id: Optional[str] = None,
         source_id: Optional[str] = None,
         target_id: Optional[str] = None,
         type: Optional[str] = None,
-        limit: int = 100,
+        include_invalid: bool = False,
+        invalid_only: bool = False,
+        orphan_only: bool = False,
+        limit: int = 200,
     ) -> List[Fact]:
-        """List relationships in project."""
-        params: Dict[str, Union[str, int]] = {"limit": limit}
+        """List relationships with optional filters."""
+        params: Dict[str, Union[str, int, bool]] = {
+            "limit": limit,
+            "include_invalid": include_invalid,
+            "invalid_only": invalid_only,
+            "orphan_only": orphan_only,
+        }
+        if sheet_id:
+            params["sheet_id"] = sheet_id
         if source_id:
             params["source_id"] = source_id
         if target_id:
@@ -394,7 +609,7 @@ class Relationships:
             f"/projects/{self._project_id}/relationships",
             params=params,
         )
-        return [Fact.model_validate(r) for r in response["relationships"]]
+        return [Fact.model_validate(item) for item in response.get("relationships", [])]
 
 
 class AsyncRelationships:
@@ -406,13 +621,25 @@ class AsyncRelationships:
 
     async def list(
         self,
+        *,
+        sheet_id: Optional[str] = None,
         source_id: Optional[str] = None,
         target_id: Optional[str] = None,
         type: Optional[str] = None,
-        limit: int = 100,
+        include_invalid: bool = False,
+        invalid_only: bool = False,
+        orphan_only: bool = False,
+        limit: int = 200,
     ) -> List[Fact]:
-        """List relationships in project."""
-        params: Dict[str, Union[str, int]] = {"limit": limit}
+        """List relationships with optional filters."""
+        params: Dict[str, Union[str, int, bool]] = {
+            "limit": limit,
+            "include_invalid": include_invalid,
+            "invalid_only": invalid_only,
+            "orphan_only": orphan_only,
+        }
+        if sheet_id:
+            params["sheet_id"] = sheet_id
         if source_id:
             params["source_id"] = source_id
         if target_id:
@@ -424,16 +651,16 @@ class AsyncRelationships:
             f"/projects/{self._project_id}/relationships",
             params=params,
         )
-        return [Fact.model_validate(r) for r in response["relationships"]]
+        return [Fact.model_validate(item) for item in response.get("relationships", [])]
 
 
 # =============================================================================
-# ProjectInstance - bound to a specific project
+# Project instance
 # =============================================================================
 
 
 class ProjectInstance:
-    """A project with access to nested resources (sync)."""
+    """Project handle with nested resources (sync)."""
 
     def __init__(self, client: "BaseClient", project: Project):
         self._client = client
@@ -451,46 +678,39 @@ class ProjectInstance:
     def description(self) -> Optional[str]:
         return self._project.description
 
+    @property
+    def data(self) -> Project:
+        """Raw project model data."""
+        return self._project
+
     @cached_property
     def sheets(self) -> Sheets:
-        """Sheet ingestion API."""
         return Sheets(self._client, self.id)
 
     @cached_property
     def entities(self) -> Entities:
-        """Entity retrieval API."""
         return Entities(self._client, self.id)
 
     @cached_property
     def relationships(self) -> Relationships:
-        """Relationship retrieval API."""
         return Relationships(self._client, self.id)
 
     def search(
         self,
         query: str,
+        *,
         limit: int = 10,
-        filters: Optional[Dict] = None,
+        channels: Optional[List[str]] = None,
         include_graph_context: bool = True,
     ) -> SearchResponse:
-        """Semantic search across project.
-
-        Args:
-            query: Search query text
-            limit: Max results to return
-            filters: Optional filters (sheet_id, entity_type)
-            include_graph_context: Include related entities
-
-        Returns:
-            SearchResponse with results
-        """
-        body: Dict = {
+        """Search entities, facts, and communities in the project."""
+        body: Dict[str, Union[str, int, bool, List[str]]] = {
             "query": query,
             "limit": limit,
             "include_graph_context": include_graph_context,
         }
-        if filters:
-            body["filters"] = filters
+        if channels is not None:
+            body["channels"] = channels
 
         return self._client.post(
             f"/projects/{self.id}/search",
@@ -498,28 +718,13 @@ class ProjectInstance:
             cast_to=SearchResponse,
         )
 
-    def query(self, question: str) -> QueryResponse:
-        """Ask a natural language question.
-
-        Args:
-            question: Question in natural language
-
-        Returns:
-            QueryResponse with answer and sources
-        """
-        return self._client.post(
-            f"/projects/{self.id}/query",
-            json={"question": question},
-            cast_to=QueryResponse,
-        )
-
-    def delete(self) -> None:
-        """Delete this project and all its data."""
-        self._client.delete(f"/projects/{self.id}")
+    def delete(self) -> ProjectDeleteResult:
+        """Delete this project."""
+        return self._client.delete(f"/projects/{self.id}", cast_to=ProjectDeleteResult)
 
 
 class AsyncProjectInstance:
-    """A project with access to nested resources (async)."""
+    """Project handle with nested resources (async)."""
 
     def __init__(self, client: "AsyncBaseClient", project: Project):
         self._client = client
@@ -537,36 +742,39 @@ class AsyncProjectInstance:
     def description(self) -> Optional[str]:
         return self._project.description
 
+    @property
+    def data(self) -> Project:
+        """Raw project model data."""
+        return self._project
+
     @cached_property
     def sheets(self) -> AsyncSheets:
-        """Sheet ingestion API."""
         return AsyncSheets(self._client, self.id)
 
     @cached_property
     def entities(self) -> AsyncEntities:
-        """Entity retrieval API."""
         return AsyncEntities(self._client, self.id)
 
     @cached_property
     def relationships(self) -> AsyncRelationships:
-        """Relationship retrieval API."""
         return AsyncRelationships(self._client, self.id)
 
     async def search(
         self,
         query: str,
+        *,
         limit: int = 10,
-        filters: Optional[Dict] = None,
+        channels: Optional[List[str]] = None,
         include_graph_context: bool = True,
     ) -> SearchResponse:
-        """Semantic search across project (async)."""
-        body: Dict = {
+        """Search entities, facts, and communities in the project."""
+        body: Dict[str, Union[str, int, bool, List[str]]] = {
             "query": query,
             "limit": limit,
             "include_graph_context": include_graph_context,
         }
-        if filters:
-            body["filters"] = filters
+        if channels is not None:
+            body["channels"] = channels
 
         return await self._client.post(
             f"/projects/{self.id}/search",
@@ -574,95 +782,91 @@ class AsyncProjectInstance:
             cast_to=SearchResponse,
         )
 
-    async def query(self, question: str) -> QueryResponse:
-        """Ask a natural language question (async)."""
-        return await self._client.post(
-            f"/projects/{self.id}/query",
-            json={"question": question},
-            cast_to=QueryResponse,
-        )
-
-    async def delete(self) -> None:
-        """Delete this project and all its data."""
-        await self._client.delete(f"/projects/{self.id}")
+    async def delete(self) -> ProjectDeleteResult:
+        """Delete this project."""
+        return await self._client.delete(f"/projects/{self.id}", cast_to=ProjectDeleteResult)
 
 
 # =============================================================================
-# Projects resource (top-level)
+# Projects top-level
 # =============================================================================
 
 
 class Projects:
-    """Tier 2: Project management API (sync)."""
+    """Top-level project API (sync)."""
 
     def __init__(self, client: "BaseClient"):
         self._client = client
 
-    def create(
-        self,
-        name: str,
-        description: Optional[str] = None,
-    ) -> ProjectInstance:
-        """Create a new project.
-
-        Args:
-            name: Project name
-            description: Optional description
-
-        Returns:
-            ProjectInstance with access to sheets, search, etc.
-        """
-        data = self._client.post(
+    def create(self, name: str, description: Optional[str] = None) -> ProjectInstance:
+        """Create a project."""
+        project = self._client.post(
             "/projects",
             json={"name": name, "description": description},
             cast_to=Project,
         )
-        return ProjectInstance(self._client, data)
+        return ProjectInstance(self._client, project)
 
-    def list(self, limit: int = 100) -> List[Project]:
-        """List all projects."""
-        response = self._client.get("/projects", params={"limit": limit})
-        return [Project.model_validate(p) for p in response["projects"]]
+    def list(self, limit: Optional[int] = None) -> List[Project]:
+        """List projects available to the API key."""
+        params = {"limit": limit} if limit is not None else None
+        response = self._client.get("/projects", params=params)
+        return [Project.model_validate(item) for item in response.get("projects", [])]
 
     def get(self, project_id: str) -> ProjectInstance:
-        """Get a project by ID."""
-        data = self._client.get(f"/projects/{project_id}", cast_to=Project)
-        return ProjectInstance(self._client, data)
+        """Get one project."""
+        project = self._client.get(f"/projects/{project_id}", cast_to=Project)
+        return ProjectInstance(self._client, project)
 
-    def delete(self, project_id: str) -> None:
-        """Delete a project and all its data."""
-        self._client.delete(f"/projects/{project_id}")
+    def delete(self, project_id: str) -> ProjectDeleteResult:
+        """Delete one project."""
+        return self._client.delete(f"/projects/{project_id}", cast_to=ProjectDeleteResult)
 
 
 class AsyncProjects:
-    """Tier 2: Project management API (async)."""
+    """Top-level project API (async)."""
 
     def __init__(self, client: "AsyncBaseClient"):
         self._client = client
 
-    async def create(
-        self,
-        name: str,
-        description: Optional[str] = None,
-    ) -> AsyncProjectInstance:
-        """Create a new project (async)."""
-        data = await self._client.post(
+    async def create(self, name: str, description: Optional[str] = None) -> AsyncProjectInstance:
+        """Create a project."""
+        project = await self._client.post(
             "/projects",
             json={"name": name, "description": description},
             cast_to=Project,
         )
-        return AsyncProjectInstance(self._client, data)
+        return AsyncProjectInstance(self._client, project)
 
-    async def list(self, limit: int = 100) -> List[Project]:
-        """List all projects (async)."""
-        response = await self._client.get("/projects", params={"limit": limit})
-        return [Project.model_validate(p) for p in response["projects"]]
+    async def list(self, limit: Optional[int] = None) -> List[Project]:
+        """List projects available to the API key."""
+        params = {"limit": limit} if limit is not None else None
+        response = await self._client.get("/projects", params=params)
+        return [Project.model_validate(item) for item in response.get("projects", [])]
 
     async def get(self, project_id: str) -> AsyncProjectInstance:
-        """Get a project by ID (async)."""
-        data = await self._client.get(f"/projects/{project_id}", cast_to=Project)
-        return AsyncProjectInstance(self._client, data)
+        """Get one project."""
+        project = await self._client.get(f"/projects/{project_id}", cast_to=Project)
+        return AsyncProjectInstance(self._client, project)
 
-    async def delete(self, project_id: str) -> None:
-        """Delete a project and all its data (async)."""
-        await self._client.delete(f"/projects/{project_id}")
+    async def delete(self, project_id: str) -> ProjectDeleteResult:
+        """Delete one project."""
+        return await self._client.delete(f"/projects/{project_id}", cast_to=ProjectDeleteResult)
+
+
+__all__ = [
+    "Projects",
+    "AsyncProjects",
+    "ProjectInstance",
+    "AsyncProjectInstance",
+    "Sheets",
+    "AsyncSheets",
+    "Entities",
+    "AsyncEntities",
+    "Relationships",
+    "AsyncRelationships",
+    "Job",
+    "AsyncJob",
+    "JobBatch",
+    "AsyncJobBatch",
+]

@@ -1,22 +1,4 @@
-"""StruAI Python SDK - Drawing Analysis API client.
-
-Example:
-    >>> import os
-    >>> from struai import StruAI
-    >>>
-    >>> client = StruAI(api_key=os.environ["STRUAI_API_KEY"])
-    >>>
-    >>> # Tier 1: Raw detection ($0.02/page)
-    >>> result = client.drawings.analyze("plans.pdf", page=4)
-    >>> for leader in result.annotations.leaders:
-    ...     print(leader.texts_inside[0].text)
-    >>>
-    >>> # Tier 2: Graph + Search ($0.15/page)
-    >>> project = client.projects.create("Building A")
-    >>> job = project.sheets.add("plans.pdf", page=4)
-    >>> job.wait()
-    >>> results = project.search("W12x26 beam connections")
-"""
+"""StruAI Python SDK."""
 
 from ._client import AsyncStruAI, StruAI
 from ._exceptions import (
@@ -33,46 +15,44 @@ from ._exceptions import (
     ValidationError,
 )
 from ._version import __version__
-
-# Re-export commonly used models
 from .models import (
     Annotations,
     BBox,
+    CommunitySearchHit,
     DetailTag,
     Dimensions,
-    # Tier 1 - Drawings
+    DrawingCacheStatus,
+    DrawingDeleteResult,
     DrawingResult,
-    # Entities
     Entity,
     EntityListItem,
     EntityRelation,
+    EntitySearchHit,
     Fact,
+    FactSearchHit,
+    GraphContext,
     JobStatus,
     Leader,
-    # Common
     Point,
-    # Tier 2 - Projects
     Project,
-    QueryResponse,
+    ProjectDeleteResult,
+    RelationshipSummary,
     RevisionCloud,
     RevisionTriangle,
-    SearchHit,
-    # Search
     SearchResponse,
     SectionTag,
-    Sheet,
+    SheetAnnotations,
+    SheetDetail,
     SheetResult,
+    SheetSummary,
     TextSpan,
     TitleBlock,
 )
 
 __all__ = [
-    # Version
     "__version__",
-    # Clients
     "StruAI",
     "AsyncStruAI",
-    # Exceptions
     "StruAIError",
     "APIError",
     "AuthenticationError",
@@ -84,13 +64,13 @@ __all__ = [
     "TimeoutError",
     "ConnectionError",
     "JobFailedError",
-    # Models - Common
     "Point",
     "BBox",
     "TextSpan",
     "Dimensions",
-    # Models - Tier 1
     "DrawingResult",
+    "DrawingCacheStatus",
+    "DrawingDeleteResult",
     "Annotations",
     "Leader",
     "SectionTag",
@@ -98,14 +78,19 @@ __all__ = [
     "RevisionTriangle",
     "RevisionCloud",
     "TitleBlock",
-    # Models - Tier 2
     "Project",
-    "Sheet",
-    "JobStatus",
+    "ProjectDeleteResult",
+    "SheetSummary",
+    "SheetDetail",
+    "SheetAnnotations",
     "SheetResult",
+    "JobStatus",
     "SearchResponse",
-    "SearchHit",
-    "QueryResponse",
+    "EntitySearchHit",
+    "FactSearchHit",
+    "CommunitySearchHit",
+    "GraphContext",
+    "RelationshipSummary",
     "Entity",
     "EntityListItem",
     "EntityRelation",

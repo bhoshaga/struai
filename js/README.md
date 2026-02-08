@@ -2,8 +2,6 @@
 
 Official JavaScript/TypeScript SDK for the StruAI Drawing Analysis API.
 
-See the [main README](../README.md) for Python examples.
-
 ## Installation
 
 ```bash
@@ -12,112 +10,73 @@ npm install struai
 
 ## Quick Start
 
-Get an API key from `stru.ai` and set `STRUAI_API_KEY`.
-
-```typescript
+```ts
 import { StruAI } from 'struai';
 
-// Get an API key from stru.ai and set STRUAI_API_KEY
 const client = new StruAI({ apiKey: process.env.STRUAI_API_KEY! });
-
-// Optional: override base URL (http://localhost:8000 or http://localhost:8000/v1)
-const local = new StruAI({ apiKey: process.env.STRUAI_API_KEY!, baseUrl: 'http://localhost:8000' });
+// Optional local: new StruAI({ apiKey: 'windowseat', baseUrl: 'http://localhost:8000' })
 ```
 
-## Tier 1: Raw Detection ($0.02/page)
+## Tier 1: Drawings
 
-```typescript
-// Analyze a PDF page
-const result = await client.drawings.analyze(file, { page: 4 });
-
-// The SDK auto-hashes + checks cache when you pass a file.
-// Or reuse cached PDFs by hash (skips upload)
-const resultFromCache = await client.drawings.analyze(null, { page: 4, fileHash: "abc123def4567890" });
-
-console.log(`Processed in ${result.processing_ms}ms`);
-
-for (const leader of result.annotations.leaders) {
-  const texts = leader.texts_inside.map(t => t.text).join(', ');
-  console.log(`Leader: ${texts}`);
-}
+```ts
+const drawing = await client.drawings.analyze(fileBlob, { page: 12 });
+const cache = await client.drawings.checkCache('abc123def4567890');
+const same = await client.drawings.get(drawing.id);
+await client.drawings.delete(drawing.id);
 ```
 
-## Tier 2: Graph + Search ($0.15/page)
+## Tier 2: Projects
 
-```typescript
-// Create project
+```ts
 const project = await client.projects.create({
-  name: 'Building A Structural',
-  description: '96-page structural drawing set'
+  name: 'Building A',
+  description: 'Structural set',
 });
 
-// Add sheet (async processing)
-const job = await project.sheets.add(file, { page: 4 });
-
-// The SDK auto-hashes + checks cache when you pass a file.
-// Or reuse cached PDFs by hash (skips upload)
-const cachedJob = await project.sheets.add(null, { page: 4, fileHash: "abc123def4567890" });
-const result = await job.wait({ timeout: 120000 });
-console.log(`Created ${result.entities_created} entities`);
-
-// Semantic search
-const results = await project.search('W12x26 beam connections', {
-  limit: 10,
-  includeGraphContext: true
-});
-
-for (const hit of results.results) {
-  console.log(`${hit.entity.label}: ${hit.score}`);
+// Single page -> Job
+const jobOrBatch = await project.sheets.add(fileBlob, { page: 12 });
+if ('wait' in jobOrBatch) {
+  await jobOrBatch.wait({ timeoutMs: 180_000 });
 }
 
-// Natural language query
-const answer = await project.query('What beams connect to column C3?');
-console.log(answer.answer);
+// Multi-page selector -> JobBatch
+const batch = await project.sheets.add(null, { page: '1,3,5-7', fileHash: 'abc123def4567890' });
+if ('waitAll' in batch) {
+  await batch.waitAll({ timeoutMs: 300_000 });
+}
 
-// Browse entities
-const entities = await project.entities.list({ type: 'Component', limit: 50 });
-const entity = await project.entities.get('ent_abc123');
+const sheets = await project.sheets.list();
+const details = await project.sheets.get(sheets[0].id);
+const raw = await project.sheets.getAnnotations(sheets[0].id);
 ```
 
-## Cookbook
+### Search
 
-```typescript
-const project = await client.projects.create({ name: 'Page12 Test' });
-const job = await project.sheets.add(file, { page: 12 });
-const sheetResult = await job.wait({ timeout: 180000 });
+```ts
+const search = await project.search('beam connection at grid A', {
+  limit: 10,
+  channels: ['entities', 'facts', 'communities'],
+  includeGraphContext: true,
+});
 
-const sheet = await project.sheets.get(sheetResult.sheet_id);
-const entities = await project.entities.list({ limit: 3 });
-const relationships = await project.relationships.list({ limit: 3 });
-
-const search = await project.search('beam connection', { limit: 5 });
-const answer = await project.query('What beams are called out on this sheet?');
+console.log(search.entities.length, search.facts.length, search.communities.length);
 ```
 
-## HTTP Endpoints (Reference)
+### Entities + Relationships
 
-All endpoints are under `/v1`. Use `Authorization: Bearer <API_KEY>`.
+```ts
+const entities = await project.entities.list({ limit: 20, type: 'component_instance' });
+const entity = await project.entities.get(entities[0].id, { expandTarget: true });
+const rels = await project.relationships.list({ limit: 20, includeInvalid: false });
+```
 
-Tier 1 (raw detection):
-- `POST /v1/drawings` — multipart form with `file` (PDF) **or** `file_hash`, plus `page` (1-indexed)
-- `GET /v1/drawings/{id}`
-- `DELETE /v1/drawings/{id}`
+## Local Smoke Test
 
-Tier 2 (graph + search):
-- `POST /v1/projects`
-- `GET /v1/projects`
-- `GET /v1/projects/{id}`
-- `DELETE /v1/projects/{id}`
-- `POST /v1/projects/{project_id}/sheets` — multipart form with `file` **or** `file_hash`, plus `page`
-- `GET /v1/projects/{project_id}/jobs/{job_id}`
-- `GET /v1/projects/{project_id}/sheets`
-- `GET /v1/projects/{project_id}/sheets/{sheet_id}`
-- `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
-- `POST /v1/projects/{project_id}/search`
-- `POST /v1/projects/{project_id}/query`
-- `GET /v1/projects/{project_id}/entities`
-- `GET /v1/projects/{project_id}/entities/{entity_id}`
-- `GET /v1/projects/{project_id}/relationships`
+```bash
+npm run build
+STRUAI_API_KEY=windowseat STRUAI_BASE_URL=http://localhost:8000 node scripts/smoke_local.mjs
+```
 
 ## License
 

@@ -1,21 +1,5 @@
 /**
- * StruAI JavaScript SDK - Drawing Analysis API client
- *
- * @example
- * ```typescript
- * import { StruAI } from 'struai';
- *
- * const client = new StruAI({ apiKey: process.env.STRUAI_API_KEY });
- *
- * // Tier 1: Raw detection
- * const result = await client.drawings.analyze('structural.pdf', { page: 4 });
- *
- * // Tier 2: Graph + Search
- * const project = await client.projects.create({ name: 'Building A' });
- * const job = await project.sheets.add('structural.pdf', { page: 4 });
- * await job.wait();
- * const results = await project.search('W12x26 beam connections');
- * ```
+ * StruAI JavaScript/TypeScript SDK.
  */
 
 export interface StruAIOptions {
@@ -24,51 +8,55 @@ export interface StruAIOptions {
   timeout?: number;
 }
 
+export type Point = [number, number];
+export type BBox = [number, number, number, number];
+export type Uploadable = Blob | ArrayBuffer | ArrayBufferView | string;
+
 export interface Dimensions {
   width: number;
   height: number;
 }
 
 export interface TextSpan {
-  id: number;
+  id?: string | number | null;
   text: string;
 }
 
 export interface Leader {
   id: string;
-  bbox: [number, number, number, number];
-  arrow_tip: [number, number];
-  text_bbox: [number, number, number, number];
+  bbox?: BBox | null;
+  arrow_tip?: Point | null;
+  text_bbox?: BBox | null;
   texts_inside: TextSpan[];
 }
 
 export interface SectionTag {
   id: string;
-  bbox: [number, number, number, number];
-  circle: { center: [number, number]; radius: number };
-  direction: string;
+  bbox?: BBox | null;
+  circle?: { center: Point; radius: number } | null;
+  direction?: string | null;
   texts_inside: TextSpan[];
-  section_line?: { start: [number, number]; end: [number, number] };
+  section_line?: { start: Point; end: Point } | null;
 }
 
 export interface DetailTag {
   id: string;
-  bbox: [number, number, number, number];
-  circle: { center: [number, number]; radius: number };
+  bbox?: BBox | null;
+  circle?: { center: Point; radius: number } | null;
   texts_inside: TextSpan[];
-  has_dashed_bbox: boolean;
+  has_dashed_bbox?: boolean;
 }
 
 export interface RevisionTriangle {
   id: string;
-  bbox: [number, number, number, number];
-  vertices: [number, number][];
-  text: string;
+  bbox?: BBox | null;
+  vertices: Point[];
+  text?: string | null;
 }
 
 export interface RevisionCloud {
   id: string;
-  bbox: [number, number, number, number];
+  bbox?: BBox | null;
 }
 
 export interface Annotations {
@@ -80,8 +68,8 @@ export interface Annotations {
 }
 
 export interface TitleBlock {
-  bounds: [number, number, number, number];
-  viewport: [number, number, number, number];
+  bounds?: BBox | null;
+  viewport?: BBox | null;
 }
 
 export interface DrawingResult {
@@ -90,103 +78,234 @@ export interface DrawingResult {
   dimensions: Dimensions;
   processing_ms: number;
   annotations: Annotations;
-  titleblock?: TitleBlock;
+  titleblock?: TitleBlock | null;
+}
+
+export interface DrawingCacheStatus {
+  cached: boolean;
+  file_hash: string;
+}
+
+export interface DrawingDeleteResult {
+  deleted: boolean;
+  id: string;
 }
 
 export interface Project {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   created_at?: string | null;
-  sheets_count: number;
-  entities_count: number;
+  sheet_count?: number;
+  entity_count?: number;
+  rel_count?: number;
+  community_count?: number;
 }
 
-export interface Sheet {
+export interface ProjectDeleteResult {
+  deleted: boolean;
   id: string;
-  title?: string;
-  page?: number | null;
-  width?: number | null;
-  height?: number | null;
-  created_at: string;
-  entities_count: number;
+}
+
+export interface JobSummary {
+  job_id: string;
+  page: number;
+}
+
+export interface SheetIngestResponse {
+  jobs: JobSummary[];
 }
 
 export interface SheetResult {
-  sheet_id: string;
-  entities_created: number;
-  relationships_created: number;
+  sheet_id?: string;
+  entities_created?: number;
+  relationships_created?: number;
+  skipped?: boolean;
+  [key: string]: unknown;
+}
+
+export interface JobStatusEvent {
+  seq: number;
+  event: string;
+  status: string;
+  at_utc: string;
+  message?: string;
+  step?: {
+    key: string;
+    index: number;
+    total: number;
+    label: string;
+  };
+  error?: Record<string, unknown>;
 }
 
 export interface JobStatus {
   job_id: string;
-  status: 'processing' | 'complete' | 'failed';
-  steps: {
-    detection: { status: string; duration_ms?: number };
-    enrichment: { status: string; duration_ms?: number; tokens?: number };
-    synthesis: { status: string; duration_ms?: number; tokens?: number };
-    graph: { status: string; duration_ms?: number };
-  };
+  page?: number;
+  status: 'queued' | 'running' | 'complete' | 'failed' | string;
+  created_at_utc?: string | null;
+  started_at_utc?: string | null;
+  completed_at_utc?: string | null;
+  current_step?: string | null;
+  step_timings?: Record<string, { start_utc?: string; end_utc?: string; duration_ms?: number }>;
+  status_log?: JobStatusEvent[];
   result?: SheetResult;
   error?: string;
 }
 
-export interface SearchHit {
-  entity: {
-    id: string;
-    type: string;
-    label: string;
-    description?: string;
-    sheet_id: string;
-    bbox?: [number, number, number, number];
+export interface SheetSummary {
+  id: string;
+  sheet_uuid?: string | null;
+  title?: string | null;
+  revision?: string | null;
+  page?: number | null;
+  width?: number | null;
+  height?: number | null;
+  mention_count?: number;
+  component_instance_count?: number;
+  region_count?: number;
+  created_at?: string | null;
+}
+
+export interface SheetRegion {
+  id: string;
+  type?: string;
+  label?: string;
+  category?: string;
+  description?: string;
+  bbox?: BBox | null;
+}
+
+export interface SheetMention {
+  id: string;
+  type?: string;
+  label?: string;
+  text?: string;
+  description?: string;
+  bbox?: BBox | null;
+  region_id?: string;
+  attributes?: unknown;
+  provenance?: unknown;
+}
+
+export interface SheetComponentInstance {
+  id: string;
+  label?: string;
+  family?: string;
+  material?: string;
+  discipline?: string;
+  bbox?: BBox | null;
+  region_id?: string;
+  component_type_uuid?: string;
+  resolution_state?: string;
+  resolution_reason?: string;
+}
+
+export interface SheetReference {
+  id: string;
+  source_id?: string;
+  target_sheet_id?: string;
+  target_sheet_uuid?: string;
+  target_unresolved?: boolean;
+  fact?: string;
+  target_detail?: string;
+}
+
+export interface SheetDetail {
+  id: string;
+  sheet_uuid?: string | null;
+  title?: string | null;
+  revision?: string | null;
+  page?: number | null;
+  width?: number | null;
+  height?: number | null;
+  regions: SheetRegion[];
+  mentions: SheetMention[];
+  component_instances: SheetComponentInstance[];
+  references: SheetReference[];
+}
+
+export interface SheetAnnotations {
+  sheet_id: string;
+  page: number;
+  dimensions: Dimensions;
+  annotations: {
+    leaders: Array<Record<string, unknown>>;
+    section_tags: Array<Record<string, unknown>>;
+    detail_tags: Array<Record<string, unknown>>;
+    revision_triangles: Array<Record<string, unknown>>;
+    revision_clouds: Array<Record<string, unknown>>;
+    [key: string]: Array<Record<string, unknown>>;
   };
+  titleblock?: Record<string, unknown> | null;
+}
+
+export interface SheetDeleteResult {
+  deleted: boolean;
+  sheet_id: string;
+  cleanup?: {
+    deleted_nodes?: number;
+    deleted_fact_uuids?: string[];
+    deleted_reference_uuids?: string[];
+  };
+  maintenance?: {
+    community_mode?: string;
+    semantic_index_mode?: string;
+    communities_count?: number;
+    semantic_points_upserted?: number;
+    semantic_points_deleted?: number;
+  };
+}
+
+export interface ConnectedEntity {
+  id: string;
+  type: string;
+  label?: string;
+  description?: string;
+  sheet_id?: string;
+  bbox?: BBox | null;
+}
+
+export interface GraphContext {
+  connected_entities: ConnectedEntity[];
+  relationships: Array<{ type?: string; fact?: string }>;
+}
+
+export interface EntitySearchHit {
+  id: string;
+  type: string;
+  label?: string;
+  description?: string;
+  sheet_id?: string;
+  bbox?: BBox | null;
   score: number;
-  graph_context?: {
-    connected_entities: Array<{ id: string; type: string; label: string }>;
-    relationships: Array<{ type: string; fact: string }>;
-  };
+  attributes?: Record<string, unknown>;
+  graph_context?: GraphContext;
+}
+
+export interface FactSearchHit {
+  id: string;
+  predicate?: string;
+  source?: string;
+  target?: string;
+  fact_text?: string;
+  sheet_id?: string;
+  score: number;
+}
+
+export interface CommunitySearchHit {
+  id: string;
+  name?: string;
+  summary?: string;
+  member_count?: number;
+  score: number;
 }
 
 export interface SearchResponse {
-  results: SearchHit[];
+  entities: EntitySearchHit[];
+  facts: FactSearchHit[];
+  communities: CommunitySearchHit[];
   search_ms: number;
-}
-
-export interface QueryResponse {
-  answer: string;
-  sources: Array<{
-    entity_id: string;
-    sheet_id: string;
-    label: string;
-    bbox?: [number, number, number, number];
-  }>;
-  confidence: number;
-}
-
-export interface EntityLocation {
-  sheet_id: string;
-  sheet_title?: string;
-  page?: number | null;
-}
-
-export interface EntityRelation {
-  uuid: string;
-  type: string;
-  fact: string;
-  source_id?: string;
-  source_label?: string;
-  target_id?: string;
-  target_label?: string;
-}
-
-export interface Fact {
-  id: string;
-  type: string;
-  fact: string;
-  source_id: string;
-  target_id: string;
-  source_label?: string;
-  target_label?: string;
 }
 
 export interface EntityListItem {
@@ -195,8 +314,29 @@ export interface EntityListItem {
   label: string;
   description?: string;
   sheet_id?: string;
-  bbox?: [number, number, number, number];
-  attributes?: string;
+  bbox?: BBox | null;
+  attributes?: unknown;
+}
+
+export interface EntityLocation {
+  sheet_id: string;
+  page?: number;
+}
+
+export interface EntityRelation {
+  id: string;
+  type: string;
+  fact?: string;
+  source_id?: string;
+  target_id?: string;
+  other_id?: string;
+  other_label?: string;
+  sheet_id?: string;
+  valid_at?: string | null;
+  invalid_at?: string | null;
+  target_sheet_id?: string | null;
+  target_unresolved?: boolean;
+  target_sheet?: Record<string, unknown>;
 }
 
 export interface Entity {
@@ -204,9 +344,26 @@ export interface Entity {
   type: string;
   label: string;
   description?: string;
+  sheet_id?: string;
+  bbox?: BBox | null;
+  attributes?: unknown;
+  provenance?: unknown;
   outgoing: EntityRelation[];
   incoming: EntityRelation[];
   locations: EntityLocation[];
+}
+
+export interface Fact {
+  id: string;
+  type: string;
+  fact?: string;
+  source_id?: string;
+  target_id?: string;
+  sheet_id?: string;
+  valid_at?: string | null;
+  invalid_at?: string | null;
+  target_sheet_id?: string | null;
+  target_unresolved?: boolean;
 }
 
 const DEFAULT_BASE_URL = 'https://api.stru.ai';
@@ -240,55 +397,19 @@ class APIError extends Error {
   }
 }
 
-class Drawings {
-  constructor(private client: StruAI) {}
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  async analyze(
-    file: File | Blob | null,
-    options: { page: number; fileHash?: string }
-  ): Promise<DrawingResult> {
-    const formData = new FormData();
-
-    let fileHash = options.fileHash;
-    if (fileHash && file) {
-      throw new Error('Provide file or fileHash, not both.');
-    }
-
-    if (!fileHash) {
-      if (!file) {
-        throw new Error('Provide file or fileHash.');
-      }
-      const computedHash = await computeFileHashFromBlob(file);
-      const cache = await this.client.request<{ cached: boolean }>(
-        `/drawings/cache/${computedHash}`
-      );
-      if (cache.cached) {
-        file = null;
-        fileHash = computedHash;
-      }
-    }
-
-    if (fileHash) {
-      formData.append('file_hash', fileHash);
-    }
-    if (file) {
-      formData.append('file', file);
-    }
-    formData.append('page', options.page.toString());
-
-    return this.client.request<DrawingResult>('/drawings', {
-      method: 'POST',
-      body: formData,
-    });
+function parsePageSelector(page: number | string): string {
+  if (typeof page === 'number') {
+    return String(page);
   }
-
-  async get(drawingId: string): Promise<DrawingResult> {
-    return this.client.request<DrawingResult>(`/drawings/${drawingId}`);
+  const text = page.trim();
+  if (!text) {
+    throw new Error('page is required');
   }
-
-  async delete(drawingId: string): Promise<void> {
-    await this.client.request(`/drawings/${drawingId}`, { method: 'DELETE' });
-  }
+  return text;
 }
 
 function bufferToHex(buffer: ArrayBuffer): string {
@@ -297,20 +418,122 @@ function bufferToHex(buffer: ArrayBuffer): string {
     .join('');
 }
 
-async function computeFileHashFromBlob(file: Blob): Promise<string> {
-  const buffer = await file.arrayBuffer();
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function readUploadableBytes(file: Uploadable): Promise<Uint8Array> {
+  if (typeof file === 'string') {
+    const fs = await import('node:fs/promises');
+    const data = await fs.readFile(file);
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+
+  if (file instanceof ArrayBuffer) {
+    return new Uint8Array(file);
+  }
+
+  if (ArrayBuffer.isView(file)) {
+    return new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
+  }
+
+  const blob = file as Blob;
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function computeFileHash(file: Uploadable): Promise<string> {
+  const bytes = await readUploadableBytes(file);
 
   if (globalThis.crypto?.subtle) {
-    const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', toArrayBuffer(bytes));
     return bufferToHex(digest).slice(0, 16);
   }
 
-  try {
-    const crypto = await import('node:crypto');
-    const hash = crypto.createHash('sha256').update(Buffer.from(buffer)).digest('hex');
-    return hash.slice(0, 16);
-  } catch {
-    throw new Error('SHA-256 not available in this environment.');
+  const crypto = await import('node:crypto');
+  const hash = crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+  return hash.slice(0, 16);
+}
+
+async function uploadableToFormPart(file: Uploadable): Promise<{ blob: Blob; filename: string }> {
+  if (typeof file === 'string') {
+    const path = await import('node:path');
+    const bytes = await readUploadableBytes(file);
+    return {
+      blob: new Blob([toArrayBuffer(bytes)], { type: 'application/pdf' }),
+      filename: path.basename(file),
+    };
+  }
+
+  if (file instanceof ArrayBuffer || ArrayBuffer.isView(file)) {
+    const bytes = await readUploadableBytes(file);
+    return {
+      blob: new Blob([toArrayBuffer(bytes)], { type: 'application/pdf' }),
+      filename: 'document.pdf',
+    };
+  }
+
+  const blob = file as Blob;
+  const name = (blob as File).name ?? 'document.pdf';
+  return { blob, filename: name };
+}
+
+class Drawings {
+  constructor(private client: StruAI) {}
+
+  async analyze(
+    file: Uploadable | null,
+    options: { page: number; fileHash?: string }
+  ): Promise<DrawingResult> {
+    let fileHash = options.fileHash;
+
+    if (fileHash && file) {
+      throw new Error('Provide file or fileHash, not both.');
+    }
+    if (!fileHash && !file) {
+      throw new Error('Provide file or fileHash.');
+    }
+
+    if (!fileHash && file) {
+      const computedHash = await computeFileHash(file);
+      const cache = await this.checkCache(computedHash);
+      if (cache.cached) {
+        fileHash = computedHash;
+        file = null;
+      }
+    }
+
+    const formData = new FormData();
+    formData.append('page', String(options.page));
+    if (fileHash) {
+      formData.append('file_hash', fileHash);
+    }
+    if (file) {
+      const part = await uploadableToFormPart(file);
+      formData.append('file', part.blob, part.filename);
+    }
+
+    return this.client.request<DrawingResult>('/drawings', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async checkCache(fileHash: string): Promise<DrawingCacheStatus> {
+    return this.client.request<DrawingCacheStatus>(`/drawings/cache/${fileHash}`);
+  }
+
+  async get(drawingId: string): Promise<DrawingResult> {
+    return this.client.request<DrawingResult>(`/drawings/${drawingId}`);
+  }
+
+  async delete(drawingId: string): Promise<DrawingDeleteResult> {
+    return this.client.request<DrawingDeleteResult>(`/drawings/${drawingId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async computeFileHash(file: Uploadable): Promise<string> {
+    return computeFileHash(file);
   }
 }
 
@@ -318,31 +541,47 @@ class Job {
   constructor(
     private client: StruAI,
     private projectId: string,
-    public readonly id: string
+    public readonly id: string,
+    public readonly page?: number
   ) {}
 
   async status(): Promise<JobStatus> {
-    return this.client.request<JobStatus>(
-      `/projects/${this.projectId}/jobs/${this.id}`
-    );
+    return this.client.request<JobStatus>(`/projects/${this.projectId}/jobs/${this.id}`);
   }
 
-  async wait(options?: { timeout?: number; pollInterval?: number }): Promise<SheetResult> {
-    const timeout = options?.timeout ?? 120000;
-    const pollInterval = options?.pollInterval ?? 2000;
+  async wait(options?: { timeoutMs?: number; pollIntervalMs?: number }): Promise<SheetResult> {
+    const timeoutMs = options?.timeoutMs ?? 120_000;
+    const pollIntervalMs = options?.pollIntervalMs ?? 2_000;
     const start = Date.now();
 
-    while (Date.now() - start < timeout) {
+    while (Date.now() - start < timeoutMs) {
       const status = await this.status();
-      if (status.status === 'complete' && status.result) {
-        return status.result;
+      if (status.status === 'complete') {
+        return status.result ?? {};
       }
       if (status.status === 'failed') {
         throw new APIError(`Job ${this.id} failed: ${status.error}`);
       }
-      await new Promise((r) => setTimeout(r, pollInterval));
+      await delay(pollIntervalMs);
     }
-    throw new APIError(`Job ${this.id} did not complete within ${timeout}ms`);
+
+    throw new APIError(`Job ${this.id} did not complete within ${timeoutMs}ms`);
+  }
+}
+
+class JobBatch {
+  constructor(public readonly jobs: Job[]) {}
+
+  get ids(): string[] {
+    return this.jobs.map((job) => job.id);
+  }
+
+  async statusAll(): Promise<JobStatus[]> {
+    return Promise.all(this.jobs.map((job) => job.status()));
+  }
+
+  async waitAll(options?: { timeoutMs?: number; pollIntervalMs?: number }): Promise<SheetResult[]> {
+    return Promise.all(this.jobs.map((job) => job.wait(options)));
   }
 }
 
@@ -353,63 +592,100 @@ class Sheets {
   ) {}
 
   async add(
-    file: File | Blob | null,
-    options: { page: number; webhookUrl?: string; fileHash?: string }
-  ): Promise<Job> {
-    const formData = new FormData();
+    file: Uploadable | null,
+    options: {
+      page: number | string;
+      fileHash?: string;
+      sourceDescription?: string;
+      onSheetExists?: 'error' | 'skip' | 'rebuild';
+      communityUpdateMode?: 'incremental' | 'rebuild';
+      semanticIndexUpdateMode?: 'incremental' | 'rebuild';
+    }
+  ): Promise<Job | JobBatch> {
     let fileHash = options.fileHash;
+
     if (fileHash && file) {
       throw new Error('Provide file or fileHash, not both.');
     }
-    if (!fileHash) {
-      if (!file) {
-        throw new Error('Provide file or fileHash.');
-      }
-      const computedHash = await computeFileHashFromBlob(file);
-      const cache = await this.client.request<{ cached: boolean }>(
-        `/drawings/cache/${computedHash}`
-      );
-      if (cache.cached) {
-        file = null;
-        fileHash = computedHash;
+    if (!fileHash && !file) {
+      throw new Error('Provide file or fileHash.');
+    }
+
+    if (!fileHash && file) {
+      const computedHash = await computeFileHash(file);
+      try {
+        const cache = await this.client.request<DrawingCacheStatus>(`/drawings/cache/${computedHash}`);
+        if (cache.cached) {
+          file = null;
+          fileHash = computedHash;
+        }
+      } catch {
+        // Fail open: continue with upload
       }
     }
 
+    const formData = new FormData();
+    formData.append('page', parsePageSelector(options.page));
     if (fileHash) {
       formData.append('file_hash', fileHash);
     }
+    if (options.sourceDescription !== undefined) {
+      formData.append('source_description', options.sourceDescription);
+    }
+    if (options.onSheetExists) {
+      formData.append('on_sheet_exists', options.onSheetExists);
+    }
+    if (options.communityUpdateMode) {
+      formData.append('community_update_mode', options.communityUpdateMode);
+    }
+    if (options.semanticIndexUpdateMode) {
+      formData.append('semantic_index_update_mode', options.semanticIndexUpdateMode);
+    }
     if (file) {
-      formData.append('file', file);
-    }
-    formData.append('page', options.page.toString());
-    if (options.webhookUrl) {
-      formData.append('webhook_url', options.webhookUrl);
+      const part = await uploadableToFormPart(file);
+      formData.append('file', part.blob, part.filename);
     }
 
-    const response = await this.client.request<{ job_id: string }>(
-      `/projects/${this.projectId}/sheets`,
-      { method: 'POST', body: formData }
+    const response = await this.client.request<SheetIngestResponse>(`/projects/${this.projectId}/sheets`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const jobs = (response.jobs ?? []).map(
+      (item) => new Job(this.client, this.projectId, item.job_id, item.page)
     );
-    return new Job(this.client, this.projectId, response.job_id);
+    if (jobs.length === 1) {
+      return jobs[0];
+    }
+    return new JobBatch(jobs);
   }
 
-  async list(options?: { limit?: number }): Promise<Sheet[]> {
+  async list(options?: { limit?: number }): Promise<SheetSummary[]> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', options.limit.toString());
-    const response = await this.client.request<{ sheets: Sheet[] }>(
-      `/projects/${this.projectId}/sheets?${params}`
+    if (options?.limit !== undefined) {
+      params.set('limit', String(options.limit));
+    }
+    const query = params.toString();
+    const response = await this.client.request<{ sheets: SheetSummary[] }>(
+      query
+        ? `/projects/${this.projectId}/sheets?${query}`
+        : `/projects/${this.projectId}/sheets`
     );
-    return response.sheets;
+    return response.sheets ?? [];
   }
 
-  async get(sheetId: string): Promise<Sheet> {
-    return this.client.request<Sheet>(
-      `/projects/${this.projectId}/sheets/${sheetId}`
+  async get(sheetId: string): Promise<SheetDetail> {
+    return this.client.request<SheetDetail>(`/projects/${this.projectId}/sheets/${sheetId}`);
+  }
+
+  async getAnnotations(sheetId: string): Promise<SheetAnnotations> {
+    return this.client.request<SheetAnnotations>(
+      `/projects/${this.projectId}/sheets/${sheetId}/annotations`
     );
   }
 
-  async delete(sheetId: string): Promise<void> {
-    await this.client.request(`/projects/${this.projectId}/sheets/${sheetId}`, {
+  async delete(sheetId: string): Promise<SheetDeleteResult> {
+    return this.client.request<SheetDeleteResult>(`/projects/${this.projectId}/sheets/${sheetId}`, {
       method: 'DELETE',
     });
   }
@@ -424,25 +700,45 @@ class Entities {
   async list(options?: {
     sheetId?: string;
     type?: string;
+    family?: string;
+    normalizedSpec?: string;
+    regionUuid?: string;
+    regionLabel?: string;
+    noteNumber?: string;
     limit?: number;
   }): Promise<EntityListItem[]> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
     if (options?.sheetId) params.set('sheet_id', options.sheetId);
     if (options?.type) params.set('type', options.type);
-    const query = params.toString();
+    if (options?.family) params.set('family', options.family);
+    if (options?.normalizedSpec) params.set('normalized_spec', options.normalizedSpec);
+    if (options?.regionUuid) params.set('region_uuid', options.regionUuid);
+    if (options?.regionLabel) params.set('region_label', options.regionLabel);
+    if (options?.noteNumber) params.set('note_number', options.noteNumber);
 
+    const query = params.toString();
     const response = await this.client.request<{ entities: EntityListItem[] }>(
       query
         ? `/projects/${this.projectId}/entities?${query}`
         : `/projects/${this.projectId}/entities`
     );
-    return response.entities;
+    return response.entities ?? [];
   }
 
-  async get(entityId: string): Promise<Entity> {
+  async get(entityId: string, options?: { includeInvalid?: boolean; expandTarget?: boolean }): Promise<Entity> {
+    const params = new URLSearchParams();
+    if (options?.includeInvalid !== undefined) {
+      params.set('include_invalid', String(options.includeInvalid));
+    }
+    if (options?.expandTarget !== undefined) {
+      params.set('expand_target', String(options.expandTarget));
+    }
+    const query = params.toString();
     return this.client.request<Entity>(
-      `/projects/${this.projectId}/entities/${entityId}`
+      query
+        ? `/projects/${this.projectId}/entities/${entityId}?${query}`
+        : `/projects/${this.projectId}/entities/${entityId}`
     );
   }
 }
@@ -454,24 +750,32 @@ class Relationships {
   ) {}
 
   async list(options?: {
+    sheetId?: string;
     sourceId?: string;
     targetId?: string;
     type?: string;
+    includeInvalid?: boolean;
+    invalidOnly?: boolean;
+    orphanOnly?: boolean;
     limit?: number;
   }): Promise<Fact[]> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.sheetId) params.set('sheet_id', options.sheetId);
     if (options?.sourceId) params.set('source_id', options.sourceId);
     if (options?.targetId) params.set('target_id', options.targetId);
     if (options?.type) params.set('type', options.type);
-    const query = params.toString();
+    if (options?.includeInvalid !== undefined) params.set('include_invalid', String(options.includeInvalid));
+    if (options?.invalidOnly !== undefined) params.set('invalid_only', String(options.invalidOnly));
+    if (options?.orphanOnly !== undefined) params.set('orphan_only', String(options.orphanOnly));
 
+    const query = params.toString();
     const response = await this.client.request<{ relationships: Fact[] }>(
       query
         ? `/projects/${this.projectId}/relationships?${query}`
         : `/projects/${this.projectId}/relationships`
     );
-    return response.relationships;
+    return response.relationships ?? [];
   }
 }
 
@@ -489,18 +793,27 @@ class ProjectInstance {
     this.relationships = new Relationships(client, project.id);
   }
 
-  get id() {
+  get id(): string {
     return this.project.id;
   }
-  get name() {
+
+  get name(): string {
     return this.project.name;
+  }
+
+  get description(): string | null | undefined {
+    return this.project.description;
+  }
+
+  get data(): Project {
+    return this.project;
   }
 
   async search(
     query: string,
     options?: {
       limit?: number;
-      filters?: { sheet_id?: string; entity_type?: string[] };
+      channels?: Array<'entities' | 'facts' | 'communities'>;
       includeGraphContext?: boolean;
     }
   ): Promise<SearchResponse> {
@@ -510,32 +823,21 @@ class ProjectInstance {
       body: JSON.stringify({
         query,
         limit: options?.limit ?? 10,
-        filters: options?.filters,
+        channels: options?.channels,
         include_graph_context: options?.includeGraphContext ?? true,
       }),
     });
   }
 
-  async query(question: string): Promise<QueryResponse> {
-    return this.client.request<QueryResponse>(`/projects/${this.id}/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
-    });
-  }
-
-  async delete(): Promise<void> {
-    await this.client.request(`/projects/${this.id}`, { method: 'DELETE' });
+  async delete(): Promise<ProjectDeleteResult> {
+    return this.client.request<ProjectDeleteResult>(`/projects/${this.id}`, { method: 'DELETE' });
   }
 }
 
 class Projects {
   constructor(private client: StruAI) {}
 
-  async create(options: {
-    name: string;
-    description?: string;
-  }): Promise<ProjectInstance> {
+  async create(options: { name: string; description?: string }): Promise<ProjectInstance> {
     const project = await this.client.request<Project>('/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -546,11 +848,13 @@ class Projects {
 
   async list(options?: { limit?: number }): Promise<Project[]> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    const query = params.toString();
+
     const response = await this.client.request<{ projects: Project[] }>(
-      `/projects?${params}`
+      query ? `/projects?${query}` : '/projects'
     );
-    return response.projects;
+    return response.projects ?? [];
   }
 
   async get(projectId: string): Promise<ProjectInstance> {
@@ -558,8 +862,8 @@ class Projects {
     return new ProjectInstance(this.client, project);
   }
 
-  async delete(projectId: string): Promise<void> {
-    await this.client.request(`/projects/${projectId}`, { method: 'DELETE' });
+  async delete(projectId: string): Promise<ProjectDeleteResult> {
+    return this.client.request<ProjectDeleteResult>(`/projects/${projectId}`, { method: 'DELETE' });
   }
 }
 
@@ -574,7 +878,7 @@ export class StruAI {
   constructor(options: StruAIOptions) {
     this.apiKey = options.apiKey;
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
-    this.timeout = options.timeout ?? 60000;
+    this.timeout = options.timeout ?? 60_000;
 
     this.drawings = new Drawings(this);
     this.projects = new Projects(this);
@@ -597,23 +901,31 @@ export class StruAI {
 
       if (!response.ok) {
         let message = response.statusText;
+        let code: string | undefined;
         try {
           const body = await response.json();
-          message = body.error?.message ?? message;
-        } catch {}
-        throw new APIError(message, response.status);
+          message = body?.error?.message ?? message;
+          code = body?.error?.code;
+        } catch {
+          // fall through
+        }
+        throw new APIError(message, response.status, code);
       }
 
       if (response.status === 204) {
         return undefined as T;
       }
 
-      return response.json();
+      const text = await response.text();
+      if (!text) {
+        return undefined as T;
+      }
+      return JSON.parse(text) as T;
     } finally {
       clearTimeout(timeoutId);
     }
   }
 }
 
-export { APIError };
+export { APIError, Job, JobBatch, ProjectInstance, Projects, Drawings, Sheets, Entities, Relationships };
 export default StruAI;

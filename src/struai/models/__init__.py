@@ -1,8 +1,11 @@
-"""StruAI models."""
+"""StruAI SDK models."""
+
 from .common import BBox, Dimensions, Point, TextSpan
 from .drawings import (
     Annotations,
     DetailTag,
+    DrawingCacheStatus,
+    DrawingDeleteResult,
     DrawingResult,
     Leader,
     RevisionCloud,
@@ -10,27 +13,49 @@ from .drawings import (
     SectionTag,
     TitleBlock,
 )
-from .entities import Entity, EntityListItem, EntityLocation, EntityRelation, Fact
-from .projects import JobStatus, JobStep, Project, Sheet, SheetResult
+from .entities import (
+    Entity,
+    EntityListItem,
+    EntityListResponse,
+    EntityLocation,
+    EntityRelation,
+    Fact,
+    RelationshipListResponse,
+)
+from .projects import (
+    JobStatus,
+    JobStatusEvent,
+    JobStepRef,
+    JobStepTiming,
+    JobSummary,
+    Project,
+    ProjectDeleteResult,
+    ProjectListResponse,
+    SheetAnnotations,
+    SheetDeleteResult,
+    SheetDetail,
+    SheetIngestResponse,
+    SheetResult,
+    SheetSummary,
+)
 from .search import (
-    EntitySummary,
+    CommunitySearchHit,
+    ConnectedEntity,
+    EntitySearchHit,
+    FactSearchHit,
     GraphContext,
-    QueryResponse,
-    QuerySource,
     RelationshipSummary,
-    SearchFilters,
-    SearchHit,
     SearchResponse,
 )
 
 __all__ = [
-    # Common
     "Point",
     "BBox",
     "TextSpan",
     "Dimensions",
-    # Drawings (Tier 1)
     "DrawingResult",
+    "DrawingCacheStatus",
+    "DrawingDeleteResult",
     "Annotations",
     "Leader",
     "SectionTag",
@@ -38,25 +63,32 @@ __all__ = [
     "RevisionTriangle",
     "RevisionCloud",
     "TitleBlock",
-    # Projects (Tier 2)
     "Project",
-    "Sheet",
-    "JobStatus",
-    "JobStep",
+    "ProjectListResponse",
+    "ProjectDeleteResult",
+    "SheetSummary",
+    "SheetDetail",
+    "SheetAnnotations",
+    "SheetDeleteResult",
     "SheetResult",
-    # Search
-    "SearchFilters",
-    "SearchHit",
+    "SheetIngestResponse",
+    "JobSummary",
+    "JobStatus",
+    "JobStatusEvent",
+    "JobStepTiming",
+    "JobStepRef",
     "SearchResponse",
-    "EntitySummary",
+    "EntitySearchHit",
+    "FactSearchHit",
+    "CommunitySearchHit",
+    "ConnectedEntity",
     "GraphContext",
     "RelationshipSummary",
-    "QueryResponse",
-    "QuerySource",
-    # Entities
     "Entity",
     "EntityListItem",
-    "EntityLocation",
+    "EntityListResponse",
     "EntityRelation",
+    "EntityLocation",
     "Fact",
+    "RelationshipListResponse",
 ]

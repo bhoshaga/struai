@@ -1,77 +1,80 @@
-"""Tier 1: Raw Detection models."""
+"""Tier 1: raw drawing detection models."""
+
+from __future__ import annotations
+
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import Field
 
-from .common import BBox, Circle, Dimensions, Line, Point, TextSpan
+from .common import BBox, Circle, Dimensions, Line, Point, SDKBaseModel, TextSpan
 
 
-class Leader(BaseModel):
+class Leader(SDKBaseModel):
     """Leader annotation with arrow and text."""
 
     id: str
-    bbox: BBox
-    arrow_tip: Point
-    text_bbox: BBox
-    texts_inside: List[TextSpan]
+    bbox: Optional[BBox] = None
+    arrow_tip: Optional[Point] = None
+    text_bbox: Optional[BBox] = None
+    texts_inside: List[TextSpan] = Field(default_factory=list)
 
 
-class SectionTag(BaseModel):
+class SectionTag(SDKBaseModel):
     """Section cut tag."""
 
     id: str
-    bbox: BBox
-    circle: Circle
-    direction: str  # "left", "right", "up", "down"
-    texts_inside: List[TextSpan]
+    bbox: Optional[BBox] = None
+    circle: Optional[Circle] = None
+    direction: Optional[str] = None
+    texts_inside: List[TextSpan] = Field(default_factory=list)
     section_line: Optional[Line] = None
 
 
-class DetailTag(BaseModel):
+class DetailTag(SDKBaseModel):
     """Detail callout tag."""
 
     id: str
-    bbox: BBox
-    circle: Circle
-    texts_inside: List[TextSpan]
+    bbox: Optional[BBox] = None
+    circle: Optional[Circle] = None
+    texts_inside: List[TextSpan] = Field(default_factory=list)
     has_dashed_bbox: bool = False
 
 
-class RevisionTriangle(BaseModel):
+class RevisionTriangle(SDKBaseModel):
     """Revision marker triangle."""
 
     id: str
-    bbox: BBox
-    vertices: List[Point]
-    text: str
+    bbox: Optional[BBox] = None
+    vertices: List[Point] = Field(default_factory=list)
+    text: Optional[str] = None
 
 
-class RevisionCloud(BaseModel):
+class RevisionCloud(SDKBaseModel):
     """Revision cloud boundary."""
 
     id: str
-    bbox: BBox
+    bbox: Optional[BBox] = None
 
 
-class Annotations(BaseModel):
+class Annotations(SDKBaseModel):
     """All detected annotations."""
 
-    leaders: List[Leader] = []
-    section_tags: List[SectionTag] = []
-    detail_tags: List[DetailTag] = []
-    revision_triangles: List[RevisionTriangle] = []
-    revision_clouds: List[RevisionCloud] = []
+    leaders: List[Leader] = Field(default_factory=list)
+    section_tags: List[SectionTag] = Field(default_factory=list)
+    detail_tags: List[DetailTag] = Field(default_factory=list)
+    revision_triangles: List[RevisionTriangle] = Field(default_factory=list)
+    revision_clouds: List[RevisionCloud] = Field(default_factory=list)
 
 
-class TitleBlock(BaseModel):
-    """Title block detection."""
+class TitleBlock(SDKBaseModel):
+    """Title block bounds and viewport."""
 
-    bounds: BBox
-    viewport: BBox  # Drawing area excluding title block
+    bounds: Optional[BBox] = None
+    viewport: Optional[BBox] = None
 
 
-class DrawingResult(BaseModel):
-    """Result from Tier 1 raw detection."""
+class DrawingResult(SDKBaseModel):
+    """Result returned by POST/GET /v1/drawings."""
 
     id: str
     page: int
@@ -79,3 +82,17 @@ class DrawingResult(BaseModel):
     processing_ms: int
     annotations: Annotations
     titleblock: Optional[TitleBlock] = None
+
+
+class DrawingCacheStatus(SDKBaseModel):
+    """Result returned by GET /v1/drawings/cache/{file_hash}."""
+
+    cached: bool
+    file_hash: str
+
+
+class DrawingDeleteResult(SDKBaseModel):
+    """Result returned by DELETE /v1/drawings/{id}."""
+
+    deleted: bool
+    id: str

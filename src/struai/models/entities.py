@@ -1,45 +1,56 @@
-"""Entity and Relationship models."""
-from typing import List, Optional
+"""Entity and relationship models."""
 
-from pydantic import BaseModel
+from __future__ import annotations
 
-from .common import BBox
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import Field
+
+from .common import BBox, SDKBaseModel
 
 
-class EntityLocation(BaseModel):
-    """Where an entity appears."""
+class EntityLocation(SDKBaseModel):
+    """Sheet location for an entity."""
 
     sheet_id: str
-    sheet_title: Optional[str] = None
     page: Optional[int] = None
 
 
-class EntityRelation(BaseModel):
-    """Relationship entry on an entity detail response."""
-
-    uuid: str
-    type: str
-    fact: str
-    source_id: Optional[str] = None
-    source_label: Optional[str] = None
-    target_id: Optional[str] = None
-    target_label: Optional[str] = None
-
-
-class Fact(BaseModel):
-    """Relationship between entities (list endpoint)."""
+class EntityRelation(SDKBaseModel):
+    """Relationship row returned in entity detail payload."""
 
     id: str
     type: str
-    fact: str
-    source_id: str
-    target_id: str
-    source_label: Optional[str] = None
-    target_label: Optional[str] = None
+    fact: Optional[str] = None
+    source_id: Optional[str] = None
+    target_id: Optional[str] = None
+    other_id: Optional[str] = None
+    other_label: Optional[str] = None
+    sheet_id: Optional[str] = None
+    valid_at: Optional[str] = None
+    invalid_at: Optional[str] = None
+    target_sheet_id: Optional[str] = None
+    target_unresolved: Optional[bool] = None
+    target_sheet: Optional[Dict[str, Any]] = None
 
 
-class EntityListItem(BaseModel):
-    """Entity summary from list endpoint."""
+class Fact(SDKBaseModel):
+    """Relationship entry from /projects/{id}/relationships."""
+
+    id: str
+    type: str
+    fact: Optional[str] = None
+    source_id: Optional[str] = None
+    target_id: Optional[str] = None
+    sheet_id: Optional[str] = None
+    valid_at: Optional[str] = None
+    invalid_at: Optional[str] = None
+    target_sheet_id: Optional[str] = None
+    target_unresolved: Optional[bool] = None
+
+
+class EntityListItem(SDKBaseModel):
+    """Entity summary from /projects/{id}/entities."""
 
     id: str
     type: str
@@ -47,16 +58,34 @@ class EntityListItem(BaseModel):
     description: Optional[str] = None
     sheet_id: Optional[str] = None
     bbox: Optional[BBox] = None
-    attributes: Optional[str] = None
+    attributes: Optional[Union[Dict[str, Any], List[Any], str]] = None
 
 
-class Entity(BaseModel):
-    """Full entity with relationships."""
+class Entity(SDKBaseModel):
+    """Full entity payload from /projects/{id}/entities/{entity_id}."""
 
     id: str
     type: str
     label: str
     description: Optional[str] = None
-    outgoing: List[EntityRelation] = []
-    incoming: List[EntityRelation] = []
-    locations: List[EntityLocation] = []
+    sheet_id: Optional[str] = None
+    bbox: Optional[BBox] = None
+    attributes: Optional[Union[Dict[str, Any], List[Any], str]] = None
+    provenance: Optional[Union[Dict[str, Any], List[Any], str]] = None
+    outgoing: List[EntityRelation] = Field(default_factory=list)
+    incoming: List[EntityRelation] = Field(default_factory=list)
+    locations: List[EntityLocation] = Field(default_factory=list)
+
+
+class EntityListResponse(SDKBaseModel):
+    """Response envelope for /projects/{id}/entities."""
+
+    project_id: str
+    entities: List[EntityListItem] = Field(default_factory=list)
+
+
+class RelationshipListResponse(SDKBaseModel):
+    """Response envelope for /projects/{id}/relationships."""
+
+    project_id: str
+    relationships: List[Fact] = Field(default_factory=list)
