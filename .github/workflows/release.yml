@@ -24,8 +24,8 @@ jobs:
     concurrency: release
     if: github.repository_owner == 'bhoshaga' && inputs.publish_only != 'true'
     outputs:
-      released: ${{ steps.version.outputs.release }}
-      version: ${{ steps.version.outputs.version }}
+      released: ${{ steps.release_result.outputs.release }}
+      version: ${{ steps.release_result.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +73,11 @@ jobs:
             npm version "$TARGET_VERSION" --no-git-tag-version
           fi
 
+      - name: Capture pre-release head
+        id: pre_release
+        if: steps.version.outputs.release == 'true'
+        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
       - name: Python Semantic Release
         if: steps.version.outputs.release == 'true'
         env:
@@ -87,8 +92,35 @@ jobs:
           # Run semantic-release (will update Python version, commit, tag, and create release)
           semantic-release version
 
-          # Push changes and tags
-          git push origin main --follow-tags
+      - name: Resolve release outputs
+        id: release_result
+        run: |
+          if [ "${{ steps.version.outputs.release }}" != "true" ]; then
+            echo "release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          PRE_SHA="${{ steps.pre_release.outputs.sha }}"
+          POST_SHA="$(git rev-parse HEAD)"
+
+          # semantic-release may print a version but produce no new release.
+          if [ "$POST_SHA" = "$PRE_SHA" ]; then
+            echo "release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]' | head -n1 || true)"
+          if [ -z "$TAG" ]; then
+            echo "release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "release=true" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Push release commit and tags
+        if: steps.release_result.outputs.release == 'true'
+        run: git push origin main --follow-tags
 
   publish-python:
     needs: release
