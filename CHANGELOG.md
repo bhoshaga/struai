@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.3.1 (2026-02-08)
+
+### Bug Fixes
+
+- **ci**: Publish only when semantic-release creates a release
+  ([`881a513`](https://github.com/bhoshaga/struai/commit/881a513405775e73b65ae0d569085c4cc83b0534))
+
+### Documentation
+
+- **sdk**: Add complete method refs and real workflow examples
+  ([`c8f00b1`](https://github.com/bhoshaga/struai/commit/c8f00b1f5b120f0b1319d8fc93bdff9d508cc5fb))
+
+
 ## v1.3.0 (2026-02-08)
 
 ### Features
