@@ -64,7 +64,14 @@ jobs:
         if: steps.version.outputs.release == 'true'
         run: |
           cd js
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          TARGET_VERSION="${{ steps.version.outputs.version }}"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          if [ "$CURRENT_VERSION" = "$TARGET_VERSION" ]; then
+            echo "js/package.json already at version $TARGET_VERSION"
+          else
+            npm version "$TARGET_VERSION" --no-git-tag-version
+          fi
 
       - name: Python Semantic Release
         if: steps.version.outputs.release == 'true'
@@ -74,8 +81,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Add the npm package.json change
-          git add js/package.json
+          # Add npm metadata changes (package.json and lockfile when version changes)
+          git add js/package.json js/package-lock.json
 
           # Run semantic-release (will update Python version, commit, tag, and create release)
           semantic-release version
