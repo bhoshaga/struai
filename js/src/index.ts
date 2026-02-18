@@ -281,6 +281,17 @@ export interface DocQueryReferenceResolveResult {
   warnings: Record<string, unknown>[];
 }
 
+export interface DocQueryCropResult {
+  ok: boolean;
+  command: string;
+  input: Record<string, unknown>;
+  source: Record<string, unknown>;
+  image: Record<string, unknown>;
+  output_image: Record<string, unknown>;
+  transform: Record<string, unknown>;
+  warnings: string[];
+}
+
 const DEFAULT_BASE_URL = 'https://api.stru.ai';
 
 type JsonRecord = Record<string, unknown>;
@@ -351,6 +362,236 @@ function records(payload: DocQueryCypherResult): JsonRecord[] {
 function asInt(value: unknown): number {
   const num = Number(value);
   return Number.isFinite(num) ? Math.trunc(num) : 0;
+}
+
+function asNumber(value: unknown): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new Error('numeric value expected');
+  }
+  return num;
+}
+
+function parseBBoxInput(bbox: string | BBox | number[]): BBox {
+  let parts: string[] | number[];
+  if (typeof bbox === 'string') {
+    const text = bbox.trim();
+    if (!text) {
+      throw new Error('bbox is required');
+    }
+    parts = text.replace(/,/g, ' ').split(/\s+/);
+  } else {
+    parts = bbox;
+  }
+
+  if (parts.length !== 4) {
+    throw new Error('bbox must contain four values: x1,y1,x2,y2');
+  }
+
+  const values = parts.map((value) => Number(value));
+  if (!values.every((value) => Number.isFinite(value))) {
+    throw new Error('bbox values must be numeric');
+  }
+
+  return [values[0], values[1], values[2], values[3]];
+}
+
+function extractNodeBBox(payload: DocQueryNodeGetResult): { bbox: BBox; props: JsonRecord } {
+  if (!payload.found) {
+    throw new Error('source uuid not found');
+  }
+  const node = asRecord(payload.node);
+  if (!node) {
+    throw new Error('node-get returned invalid node payload');
+  }
+  const props = asRecord(node.properties);
+  if (!props) {
+    throw new Error('node-get returned invalid node properties');
+  }
+
+  const bboxMin = asRecord(props.bbox_min);
+  const bboxMax = asRecord(props.bbox_max);
+  if (bboxMin && bboxMax && bboxMin.x !== undefined && bboxMin.y !== undefined && bboxMax.x !== undefined && bboxMax.y !== undefined) {
+    return {
+      bbox: [asNumber(bboxMin.x), asNumber(bboxMin.y), asNumber(bboxMax.x), asNumber(bboxMax.y)],
+      props,
+    };
+  }
+
+  if (Array.isArray(props.bbox) && props.bbox.length === 4) {
+    const values = props.bbox.map((value) => Number(value));
+    if (!values.every((value) => Number.isFinite(value))) {
+      throw new Error('node bbox values are not numeric');
+    }
+    return { bbox: [values[0], values[1], values[2], values[3]], props };
+  }
+
+  throw new Error('node has no usable bbox_min/bbox_max (or legacy bbox)');
+}
+
+function cacheImageCandidates(pageHash: string): string[] {
+  return [
+    `drawing_pipeline/cache/${pageHash}/step2b/page_context.png`,
+    `drawing_pipeline/cache/${pageHash}/step2c/spatial_overlay.png`,
+    `drawing_pipeline/cache/${pageHash}/step2b/remaining_bbox.png`,
+  ];
+}
+
+async function resolveSourceImagePath(options: {
+  image?: string;
+  pageHash?: string;
+}): Promise<{ imagePath: string; warnings: string[] }> {
+  const warnings: string[] = [];
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  const imageArg = options.image?.trim();
+  if (imageArg) {
+    const absolute = path.resolve(process.cwd(), imageArg);
+    const stat = await fs.stat(absolute).catch(() => null);
+    if (!stat) {
+      throw new Error(`source image not found: ${absolute}`);
+    }
+    if (!stat.isFile()) {
+      throw new Error(`source image is not a file: ${absolute}`);
+    }
+    return { imagePath: absolute, warnings };
+  }
+
+  const pageHash = options.pageHash?.trim();
+  if (!pageHash) {
+    throw new Error('source image required: pass image or use uuid mode with node page_hash');
+  }
+
+  for (const candidate of cacheImageCandidates(pageHash)) {
+    const absolute = path.resolve(process.cwd(), candidate);
+    const stat = await fs.stat(absolute).catch(() => null);
+    if (stat?.isFile()) {
+      warnings.push('image auto-discovered from drawing_pipeline/cache using node page_hash');
+      return { imagePath: absolute, warnings };
+    }
+  }
+
+  throw new Error('no default page image found for page_hash in cache; pass image explicitly');
+}
+
+function pageExtents(payload: DocQueryCypherResult): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const rows = records(payload);
+  if (rows.length === 0) {
+    throw new Error('failed to infer page extents: no bbox rows for page_hash');
+  }
+  const row = rows[0];
+  const minX = asNumber(row.min_x);
+  const minY = asNumber(row.min_y);
+  const maxX = asNumber(row.max_x);
+  const maxY = asNumber(row.max_y);
+  if (maxX <= minX || maxY <= minY) {
+    throw new Error('failed to infer page extents: degenerate extents');
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function computeCropBox(options: {
+  bbox: BBox;
+  imageWidth: number;
+  imageHeight: number;
+  scale?: number;
+  scaleX?: number;
+  scaleY?: number;
+  autoScale: boolean;
+  defaultAutoScale: boolean;
+  extents?: { minX: number; minY: number; maxX: number; maxY: number };
+  pad: number;
+  clamp: boolean;
+}): {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  scaleMode: string;
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
+} {
+  if (options.scale !== undefined && (options.scaleX !== undefined || options.scaleY !== undefined)) {
+    throw new Error('use either scale or scaleX/scaleY, not both');
+  }
+
+  const manualScaleRequested =
+    options.scale !== undefined || options.scaleX !== undefined || options.scaleY !== undefined;
+  if (options.autoScale && manualScaleRequested) {
+    throw new Error('autoScale cannot be combined with explicit scale values');
+  }
+
+  let resolvedScaleX = 1;
+  let resolvedScaleY = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let scaleMode = 'identity';
+
+  if (options.scale !== undefined) {
+    resolvedScaleX = Number(options.scale);
+    resolvedScaleY = Number(options.scale);
+    scaleMode = 'manual_uniform';
+  } else if (options.scaleX !== undefined || options.scaleY !== undefined) {
+    resolvedScaleX = Number(options.scaleX ?? 1);
+    resolvedScaleY = Number(options.scaleY ?? 1);
+    scaleMode = 'manual_xy';
+  } else if (options.autoScale || options.defaultAutoScale) {
+    if (options.extents) {
+      resolvedScaleX = options.imageWidth / (options.extents.maxX - options.extents.minX);
+      resolvedScaleY = options.imageHeight / (options.extents.maxY - options.extents.minY);
+      offsetX = options.extents.minX;
+      offsetY = options.extents.minY;
+      scaleMode = 'auto_page_extents';
+    } else if (options.autoScale) {
+      throw new Error('autoScale requires pageHash and resolvable bbox extents');
+    }
+  }
+
+  if (!(resolvedScaleX > 0) || !(resolvedScaleY > 0)) {
+    throw new Error('scale factors must be > 0');
+  }
+
+  const [x1, y1, x2, y2] = options.bbox;
+  const px1 = (x1 - offsetX) * resolvedScaleX;
+  const py1 = (y1 - offsetY) * resolvedScaleY;
+  const px2 = (x2 - offsetX) * resolvedScaleX;
+  const py2 = (y2 - offsetY) * resolvedScaleY;
+
+  let left = Math.floor(Math.min(px1, px2)) - options.pad;
+  let top = Math.floor(Math.min(py1, py2)) - options.pad;
+  let right = Math.ceil(Math.max(px1, px2)) + options.pad;
+  let bottom = Math.ceil(Math.max(py1, py2)) + options.pad;
+
+  if (options.clamp) {
+    left = Math.max(0, Math.min(left, options.imageWidth));
+    top = Math.max(0, Math.min(top, options.imageHeight));
+    right = Math.max(0, Math.min(right, options.imageWidth));
+    bottom = Math.max(0, Math.min(bottom, options.imageHeight));
+  }
+
+  if (right <= left || bottom <= top) {
+    throw new Error('crop box is empty after scaling/clamping; adjust scale/bbox/pad');
+  }
+
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    scaleMode,
+    scaleX: resolvedScaleX,
+    scaleY: resolvedScaleY,
+    offsetX,
+    offsetY,
+  };
 }
 
 function bufferToHex(buffer: ArrayBuffer): string {
@@ -1130,6 +1371,195 @@ class DocQuery {
       source,
       resolved_references: resolvedReferences,
       count: resolvedReferences.length,
+      warnings,
+    };
+  }
+
+  async crop(options: {
+    output: string;
+    uuid?: string;
+    bbox?: string | BBox | number[];
+    image?: string;
+    pageHash?: string;
+    scale?: number;
+    scaleX?: number;
+    scaleY?: number;
+    autoScale?: boolean;
+    pad?: number;
+    clamp?: boolean;
+  }): Promise<DocQueryCropResult> {
+    const hasUuid = typeof options.uuid === 'string' && options.uuid.trim().length > 0;
+    const hasBbox = options.bbox !== undefined;
+    if (hasUuid === hasBbox) {
+      throw new Error('provide exactly one of uuid or bbox');
+    }
+
+    const output = requireText(options.output, 'output');
+    const path = await import('node:path');
+    const fs = await import('node:fs/promises');
+    const sharpModule = await import('sharp');
+    const sharp = sharpModule.default;
+
+    let pageHash = options.pageHash?.trim() || undefined;
+    let sourceUuid: string | undefined;
+    let sourceSheetId: string | undefined;
+    let sourceName: string | undefined;
+    let sourceCategory: string | undefined;
+    let bboxGraph: BBox;
+
+    if (hasUuid) {
+      sourceUuid = requireText(options.uuid as string, 'uuid');
+      const nodePayload = await this.nodeGet(sourceUuid);
+      const extracted = extractNodeBBox(nodePayload);
+      bboxGraph = extracted.bbox;
+
+      if (!pageHash && extracted.props.page_hash != null) {
+        pageHash = String(extracted.props.page_hash);
+      }
+      if (extracted.props.sheet_id != null) {
+        sourceSheetId = String(extracted.props.sheet_id);
+      }
+      if (typeof extracted.props.name === 'string' && extracted.props.name.trim()) {
+        sourceName = extracted.props.name;
+      } else if (typeof extracted.props.text === 'string' && extracted.props.text.trim()) {
+        sourceName = extracted.props.text;
+      }
+      if (extracted.props.category != null) {
+        sourceCategory = String(extracted.props.category);
+      }
+    } else {
+      bboxGraph = parseBBoxInput(options.bbox as string | BBox | number[]);
+    }
+
+    const { imagePath, warnings } = await resolveSourceImagePath({
+      image: options.image,
+      pageHash,
+    });
+
+    const outputPath = path.resolve(process.cwd(), output);
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+    const metadata = await sharp(imagePath).metadata();
+    const imageWidth = metadata.width ?? 0;
+    const imageHeight = metadata.height ?? 0;
+    if (!(imageWidth > 0) || !(imageHeight > 0)) {
+      throw new Error(`unable to read image dimensions for: ${imagePath}`);
+    }
+
+    const autoScale = Boolean(options.autoScale);
+    const defaultAutoScale = hasUuid;
+    let extents:
+      | {
+          minX: number;
+          minY: number;
+          maxX: number;
+          maxY: number;
+        }
+      | undefined;
+
+    if (autoScale || defaultAutoScale) {
+      if (pageHash) {
+        try {
+          const extentsPayload = await this.cypher(
+            'MATCH (n:Entity {project_id:$project_id, page_hash:$page_hash}) ' +
+              'WHERE n.bbox_min IS NOT NULL AND n.bbox_max IS NOT NULL ' +
+              'RETURN min(n.bbox_min.x) AS min_x, min(n.bbox_min.y) AS min_y, ' +
+              '       max(n.bbox_max.x) AS max_x, max(n.bbox_max.y) AS max_y ' +
+              'LIMIT 1',
+            { params: { page_hash: pageHash }, maxRows: 1 }
+          );
+          extents = pageExtents(extentsPayload);
+        } catch (error) {
+          if (autoScale) {
+            throw error;
+          }
+          warnings.push('auto-scale failed; fell back to identity scale');
+        }
+      } else if (autoScale) {
+        throw new Error('autoScale requires pageHash and resolvable bbox extents');
+      }
+    }
+
+    const safePad = Math.max(0, Math.trunc(options.pad ?? 0));
+    const clamp = options.clamp !== false;
+    const cropBox = computeCropBox({
+      bbox: bboxGraph,
+      imageWidth,
+      imageHeight,
+      scale: options.scale,
+      scaleX: options.scaleX,
+      scaleY: options.scaleY,
+      autoScale,
+      defaultAutoScale,
+      extents,
+      pad: safePad,
+      clamp,
+    });
+
+    const cropWidth = cropBox.right - cropBox.left;
+    const cropHeight = cropBox.bottom - cropBox.top;
+    await sharp(imagePath)
+      .extract({
+        left: cropBox.left,
+        top: cropBox.top,
+        width: cropWidth,
+        height: cropHeight,
+      })
+      .toFile(outputPath);
+
+    return {
+      ok: true,
+      command: 'crop',
+      input: {
+        project_id: this.projectId,
+        uuid: sourceUuid,
+        bbox: hasUuid ? null : bboxGraph,
+        page_hash: pageHash,
+        image: imagePath,
+        output: outputPath,
+        scale: options.scale,
+        scale_x: options.scaleX,
+        scale_y: options.scaleY,
+        auto_scale: autoScale,
+        pad: safePad,
+        clamp,
+      },
+      source: {
+        mode: hasUuid ? 'uuid' : 'bbox',
+        uuid: sourceUuid,
+        sheet_id: sourceSheetId,
+        name: sourceName,
+        category: sourceCategory,
+        bbox_graph: {
+          x1: bboxGraph[0],
+          y1: bboxGraph[1],
+          x2: bboxGraph[2],
+          y2: bboxGraph[3],
+        },
+        bbox_pixels: {
+          left: cropBox.left,
+          top: cropBox.top,
+          right: cropBox.right,
+          bottom: cropBox.bottom,
+        },
+      },
+      image: {
+        path: imagePath,
+        width: imageWidth,
+        height: imageHeight,
+      },
+      output_image: {
+        path: outputPath,
+        width: cropWidth,
+        height: cropHeight,
+      },
+      transform: {
+        scale_mode: cropBox.scaleMode,
+        scale_x: cropBox.scaleX,
+        scale_y: cropBox.scaleY,
+        offset_x: cropBox.offsetX,
+        offset_y: cropBox.offsetY,
+      },
       warnings,
     };
   }

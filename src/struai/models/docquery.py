@@ -121,3 +121,14 @@ class DocQueryReferenceResolveResult(SDKBaseModel):
     resolved_references: List[Dict[str, Any]] = Field(default_factory=list)
     count: int = 0
     warnings: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class DocQueryCropResult(SDKBaseModel):
+    ok: bool
+    command: str
+    input: Dict[str, Any] = Field(default_factory=dict)
+    source: Dict[str, Any] = Field(default_factory=dict)
+    image: Dict[str, Any] = Field(default_factory=dict)
+    output_image: Dict[str, Any] = Field(default_factory=dict)
+    transform: Dict[str, Any] = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)

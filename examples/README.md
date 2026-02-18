@@ -1,6 +1,7 @@
 # Python SDK Examples
 
 These examples are portable and do not use hardcoded local paths.
+DocQuery CLI parity in SDK: 10 operations (`client.projects.list` + 9 `project.docquery.*` methods, including `crop`).
 
 ## Prerequisites
 
@@ -19,6 +20,11 @@ python3 test_prod_page12.py --page 12
 
 # Full Tier 1 + Tier 2 projects/docquery workflow
 python3 test_prod_page12_full.py --page 12
+
+# Full workflow with crop demo (graph uuid -> image crop)
+python3 test_prod_page12_full.py --page 12 \
+  --crop-image /absolute/path/to/page_context.png \
+  --crop-output /absolute/path/to/crop.png
 
 # Full workflow + cleanup
 python3 test_prod_page12_full.py --page 12 --cleanup

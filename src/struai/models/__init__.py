@@ -2,6 +2,7 @@
 
 from .common import BBox, Dimensions, Point, TextSpan
 from .docquery import (
+    DocQueryCropResult,
     DocQueryCypherResult,
     DocQueryNeighbor,
     DocQueryNeighborsResult,
@@ -74,6 +75,7 @@ __all__ = [
     "DocQueryNeighbor",
     "DocQueryNeighborsResult",
     "DocQueryCypherResult",
+    "DocQueryCropResult",
     "DocQuerySheetSummaryResult",
     "DocQuerySheetListResult",
     "DocQueryReferenceResolveResult",

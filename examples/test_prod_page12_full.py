@@ -57,6 +57,16 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Delete created sheet and project at end",
     )
+    parser.add_argument(
+        "--crop-image",
+        default=os.environ.get("STRUAI_CROP_IMAGE"),
+        help="Optional page PNG path for docquery.crop demo",
+    )
+    parser.add_argument(
+        "--crop-output",
+        default=os.environ.get("STRUAI_CROP_OUTPUT", "sdk_crop.png"),
+        help="Output PNG path for docquery.crop demo (default: sdk_crop.png)",
+    )
     return parser.parse_args()
 
 
@@ -196,6 +206,19 @@ def main() -> int:
             f"reference_resolve_found={resolved.found} "
             f"resolved_count={resolved.count} warnings={len(resolved.warnings)}"
         )
+
+        if args.crop_image:
+            crop = project.docquery.crop(
+                uuid=first_uuid,
+                image=args.crop_image,
+                output=args.crop_output,
+            )
+            print(
+                "crop "
+                f"path={crop.output_image.get('path')} "
+                f"size={crop.output_image.get('width')}x{crop.output_image.get('height')} "
+                f"scale_mode={crop.transform.get('scale_mode')}"
+            )
     else:
         print("No search hit UUID found; skipping node/neighbors/reference-resolve.")
 

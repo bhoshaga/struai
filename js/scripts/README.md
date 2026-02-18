@@ -1,6 +1,7 @@
 # JavaScript SDK Example Scripts
 
 Run from the repository `js/` directory.
+DocQuery CLI parity in SDK: 10 operations (`client.projects.list` + 9 `project.docquery.*` methods, including `crop`).
 
 ## Prerequisites
 
@@ -20,6 +21,12 @@ STRUAI_PAGE=12 node scripts/drawings_quickstart.mjs
 
 # Full Tier 1 + Tier 2 projects/docquery workflow
 STRUAI_PAGE=12 node scripts/projects_workflow.mjs
+
+# Full workflow + crop demo
+STRUAI_PAGE=12 \
+STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png \
+STRUAI_CROP_OUTPUT=/absolute/path/to/crop.png \
+node scripts/projects_workflow.mjs
 
 # Full workflow + cleanup
 STRUAI_PAGE=12 STRUAI_CLEANUP=1 node scripts/projects_workflow.mjs

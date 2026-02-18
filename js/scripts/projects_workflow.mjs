@@ -9,6 +9,9 @@
  *
  * Optional cleanup:
  *   STRUAI_CLEANUP=1 node scripts/projects_workflow.mjs
+ *
+ * Optional crop demo:
+ *   STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png STRUAI_CROP_OUTPUT=/tmp/crop.png node scripts/projects_workflow.mjs
  */
 
 import fs from 'node:fs/promises';
@@ -21,6 +24,8 @@ const pdfPath = process.env.STRUAI_PDF;
 const page = Number(process.env.STRUAI_PAGE ?? '12');
 const query = process.env.STRUAI_QUERY ?? 'beam connection';
 const cleanup = process.env.STRUAI_CLEANUP === '1';
+const cropImage = process.env.STRUAI_CROP_IMAGE;
+const cropOutput = process.env.STRUAI_CROP_OUTPUT ?? 'sdk_crop_js.png';
 const timeoutMs = Number(process.env.STRUAI_TIMEOUT_MS ?? '240000');
 const pollIntervalMs = Number(process.env.STRUAI_POLL_INTERVAL_MS ?? '2000');
 
@@ -130,6 +135,18 @@ if (typeof firstUuid === 'string' && firstUuid) {
 
   const resolved = await project.docquery.referenceResolve(firstUuid, { limit: 10 });
   console.log(`reference_resolve_found=${resolved.found} resolved_count=${resolved.count}`);
+
+  if (cropImage) {
+    const crop = await project.docquery.crop({
+      uuid: firstUuid,
+      image: cropImage,
+      output: cropOutput,
+    });
+    console.log(
+      `crop path=${crop.output_image.path} size=${crop.output_image.width}x${crop.output_image.height} ` +
+        `scale_mode=${crop.transform.scale_mode}`
+    );
+  }
 } else {
   console.log('No search hit UUID found; skipping node/neighbors/reference-resolve.');
 }

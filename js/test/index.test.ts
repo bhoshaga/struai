@@ -1,3 +1,7 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Job, JobBatch, StruAI } from '../src/index';
 
@@ -118,5 +122,34 @@ describe('StruAI JS SDK', () => {
     expect(summary.reachability.unreachable_non_sheet).toBe(2);
     expect(summary.warnings.map((w) => w.type)).toContain('missing_sheet_node');
     expect(summary.orphan_examples.length).toBe(1);
+  });
+
+  it('crops an image region in bbox mode', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'struai-crop-'));
+    const sourcePath = path.join(tmpDir, 'source.png');
+    const outputPath = path.join(tmpDir, 'crop.png');
+    await sharp({
+      create: {
+        width: 120,
+        height: 80,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .png()
+      .toFile(sourcePath);
+
+    const client = new StruAI({ apiKey: 'k', baseUrl: 'http://localhost:8000' });
+    const project = client.projects.open('proj_1');
+    const result = await project.docquery.crop({
+      image: sourcePath,
+      output: outputPath,
+      bbox: [10, 15, 50, 45],
+    });
+
+    expect(result.command).toBe('crop');
+    expect(result.output_image.width).toBe(40);
+    expect(result.output_image.height).toBe(30);
+    await expect(fs.stat(outputPath)).resolves.toBeDefined();
   });
 });

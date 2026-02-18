@@ -52,6 +52,12 @@ python3 examples/test_prod_page12.py --pdf /absolute/path/to/structural.pdf --pa
 # Full projects + docquery workflow
 python3 examples/test_prod_page12_full.py --pdf /absolute/path/to/structural.pdf --page 12
 
+# Full workflow + crop demo
+python3 examples/test_prod_page12_full.py \
+  --pdf /absolute/path/to/structural.pdf --page 12 \
+  --crop-image /absolute/path/to/page_context.png \
+  --crop-output /absolute/path/to/crop.png
+
 # Optional cleanup after full workflow
 python3 examples/test_prod_page12_full.py --pdf /absolute/path/to/structural.pdf --cleanup
 
@@ -67,13 +73,20 @@ npm install
 npm run build
 
 # Drawings-only flow
-STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
+STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
 node scripts/drawings_quickstart.mjs
 
 # Full projects + docquery workflow
-STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
+STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
+node scripts/projects_workflow.mjs
+
+# Full workflow + crop demo
+STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
+STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
+STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png \
+STRUAI_CROP_OUTPUT=/absolute/path/to/crop.png \
 node scripts/projects_workflow.mjs
 ```
 
@@ -130,6 +143,27 @@ Methods:
 - `sheet_summary(sheet_id, orphan_limit=10) -> DocQuerySheetSummaryResult`
 - `sheet_list() -> DocQuerySheetListResult`
 - `reference_resolve(uuid, limit=100) -> DocQueryReferenceResolveResult`
+- `crop(output, uuid=None, bbox=None, image=None, page_hash=None, scale=None, scale_x=None, scale_y=None, auto_scale=False, pad=0, clamp=True) -> DocQueryCropResult`
+
+CLI parity: `project-list` maps to `client.projects.list()`, and the remaining 9 commands map to `project.docquery.*`, for full 10-command parity.
+
+Python cypher + crop example:
+
+```python
+project = client.projects.open("proj_86c0f02e")
+rows = project.docquery.cypher(
+    "MATCH (n:Entity {project_id:$project_id}) RETURN count(n) AS total",
+    params={},
+    max_rows=1,
+)
+
+crop = project.docquery.crop(
+    uuid="entity-uuid-here",
+    image="/absolute/path/to/page_context.png",
+    output="/absolute/path/to/crop.png",
+)
+print(rows.records[0]["total"], crop.output_image["path"])
+```
 
 ### Jobs
 

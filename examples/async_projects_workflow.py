@@ -27,6 +27,16 @@ def _parse_args() -> argparse.Namespace:
         default=os.environ.get("STRUAI_BASE_URL", "https://api.stru.ai"),
         help="Base URL",
     )
+    parser.add_argument(
+        "--crop-image",
+        default=os.environ.get("STRUAI_CROP_IMAGE"),
+        help="Optional page PNG path for docquery.crop demo",
+    )
+    parser.add_argument(
+        "--crop-output",
+        default=os.environ.get("STRUAI_CROP_OUTPUT", "sdk_crop_async.png"),
+        help="Output PNG path for docquery.crop demo",
+    )
     parser.add_argument("--cleanup", action="store_true", help="Delete project at end")
     return parser.parse_args()
 
@@ -75,12 +85,33 @@ async def _run(args: argparse.Namespace) -> int:
         search = await project.docquery.search("beam connection", limit=5)
         print(f"docquery_search_count={search.count}")
 
+        first_uuid = None
+        for hit in search.hits:
+            node = hit.node or {}
+            found = node.get("properties", {}).get("uuid")
+            if found:
+                first_uuid = str(found)
+                break
+
         if sheet_result.sheet_id:
             summary = await project.docquery.sheet_summary(sheet_result.sheet_id, orphan_limit=10)
             print(
                 "sheet_summary "
                 f"unreachable_non_sheet={summary.reachability.get('unreachable_non_sheet', 0)} "
                 f"warnings={len(summary.warnings)}"
+            )
+
+        if first_uuid and args.crop_image:
+            crop = await project.docquery.crop(
+                uuid=first_uuid,
+                image=args.crop_image,
+                output=args.crop_output,
+            )
+            print(
+                "crop "
+                f"path={crop.output_image.get('path')} "
+                f"size={crop.output_image.get('width')}x{crop.output_image.get('height')} "
+                f"scale_mode={crop.transform.get('scale_mode')}"
             )
 
         if args.cleanup:

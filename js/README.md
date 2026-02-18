@@ -45,12 +45,12 @@ npm install
 npm run build
 
 # Drawings-only flow
-STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
+STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
 node scripts/drawings_quickstart.mjs
 
 # Full projects + docquery workflow
-STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
+STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
 node scripts/projects_workflow.mjs
 
@@ -114,6 +114,23 @@ Methods:
 - `sheetSummary(sheetId, { orphanLimit? }?) -> Promise<DocQuerySheetSummaryResult>`
 - `sheetList() -> Promise<DocQuerySheetListResult>`
 - `referenceResolve(uuid, { limit? }?) -> Promise<DocQueryReferenceResolveResult>`
+- `crop({ output, uuid?, bbox?, image?, pageHash?, scale?, scaleX?, scaleY?, autoScale?, pad?, clamp? }) -> Promise<DocQueryCropResult>`
+
+CLI parity: `project-list` maps to `client.projects.list()`, and the remaining 9 commands map to `project.docquery.*`, for full 10-command parity.
+
+```ts
+const project = client.projects.open('proj_86c0f02e');
+const cypher = await project.docquery.cypher(
+  'MATCH (n:Entity {project_id:$project_id}) RETURN count(n) AS total',
+  { params: {}, maxRows: 1 }
+);
+const crop = await project.docquery.crop({
+  uuid: 'entity-uuid-here',
+  image: '/absolute/path/to/page_context.png',
+  output: '/absolute/path/to/crop.png',
+});
+console.log(cypher.records[0]?.total, crop.output_image.path);
+```
 
 ### Jobs
 

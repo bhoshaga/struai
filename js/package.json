@@ -48,6 +48,9 @@
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"
   },
+  "dependencies": {
+    "sharp": "^0.34.4"
+  },
   "engines": {
     "node": ">=18.0.0"
   }
