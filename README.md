@@ -65,6 +65,9 @@ python3 examples/test_prod_page12_full.py --pdf /absolute/path/to/structural.pdf
 python3 examples/async_projects_workflow.py --pdf /absolute/path/to/structural.pdf --page 12
 ```
 
+Page-12 cookbook with all 10 operations (including `cypher` and `crop`):
+- `examples/PAGE12_COOKBOOK.md`
+
 JavaScript examples (`/js/scripts`):
 
 ```bash

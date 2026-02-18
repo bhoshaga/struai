@@ -3,6 +3,9 @@
 These examples are portable and do not use hardcoded local paths.
 DocQuery CLI parity in SDK: 10 operations (`client.projects.list` + 9 `project.docquery.*` methods, including `crop`).
 
+Page-12 full command cookbook:
+- `PAGE12_COOKBOOK.md`
+
 ## Prerequisites
 
 ```bash
