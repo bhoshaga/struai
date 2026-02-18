@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.1.0 (2026-02-18)
+
+### Features
+
+- Add full docquery crop parity to python and js sdk
+  ([`14d3856`](https://github.com/bhoshaga/struai/commit/14d38563618d88be36fd7c90583e8485c114d548))
+
+
 ## v2.0.0 (2026-02-18)
 
 ### Features
