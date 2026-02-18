@@ -33,6 +33,9 @@ const jobOrBatch = await project.sheets.add(null, {
   page: 12,
   fileHash: await client.drawings.computeFileHash('/absolute/path/to/structural.pdf'),
 });
+
+const search = await project.docquery.search('beam connection', { limit: 5 });
+console.log(search.count);
 ```
 
 ## Real Workflow Examples
@@ -46,7 +49,7 @@ STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
 node scripts/drawings_quickstart.mjs
 
-# Full projects workflow
+# Full projects + docquery workflow
 STRUAI_API_KEY=... STRUAI_BASE_URL=http://localhost:8000 \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
 node scripts/projects_workflow.mjs
@@ -78,8 +81,8 @@ See `scripts/README.md` for quick copy/paste commands.
 ### Projects Top-Level (`client.projects`)
 
 - `create({ name, description? }) -> Promise<ProjectInstance>`
-- `list({ limit? }?) -> Promise<Project[]>`
-- `get(projectId) -> Promise<ProjectInstance>`
+- `list() -> Promise<Project[]>`
+- `open(projectId, { name?, description? }?) -> ProjectInstance`
 - `delete(projectId) -> Promise<ProjectDeleteResult>`
 
 ### Project Instance (`project`)
@@ -87,11 +90,10 @@ See `scripts/README.md` for quick copy/paste commands.
 Properties:
 
 - `id`, `name`, `description`, `data`
-- `sheets`, `entities`, `relationships`
+- `sheets`, `docquery`
 
 Methods:
 
-- `search(query, { limit?, channels?, includeGraphContext? }?) -> Promise<SearchResponse>`
 - `delete() -> Promise<ProjectDeleteResult>`
 
 ### Sheets (`project.sheets`)
@@ -99,19 +101,19 @@ Methods:
 - `add(file, { page, fileHash?, sourceDescription?, onSheetExists?, communityUpdateMode?, semanticIndexUpdateMode? }) -> Promise<Job | JobBatch>`
   - `page` supports `12`, `'1,3,5-7'`, `'all'`
   - Pass either `file` or `fileHash`
-- `list({ limit? }?) -> Promise<SheetSummary[]>`
-- `get(sheetId) -> Promise<SheetDetail>`
-- `getAnnotations(sheetId) -> Promise<SheetAnnotations>`
 - `delete(sheetId) -> Promise<SheetDeleteResult>`
+- `job(jobId, { page? }?) -> Job`
 
-### Entities (`project.entities`)
+### DocQuery (`project.docquery`)
 
-- `list({ sheetId?, type?, family?, normalizedSpec?, regionUuid?, regionLabel?, noteNumber?, limit? }?) -> Promise<EntityListItem[]>`
-- `get(entityId, { includeInvalid?, expandTarget? }?) -> Promise<Entity>`
-
-### Relationships (`project.relationships`)
-
-- `list({ sheetId?, sourceId?, targetId?, type?, includeInvalid?, invalidOnly?, orphanOnly?, limit? }?) -> Promise<Fact[]>`
+- `nodeGet(uuid) -> Promise<DocQueryNodeGetResult>`
+- `sheetEntities(sheetId, { entityType?, limit? }?) -> Promise<DocQuerySheetEntitiesResult>`
+- `search(query, { index?, limit? }?) -> Promise<DocQuerySearchResult>`
+- `neighbors(uuid, { direction?, relationshipType?, limit? }?) -> Promise<DocQueryNeighborsResult>`
+- `cypher(query, { params?, maxRows? }?) -> Promise<DocQueryCypherResult>`
+- `sheetSummary(sheetId, { orphanLimit? }?) -> Promise<DocQuerySheetSummaryResult>`
+- `sheetList() -> Promise<DocQuerySheetListResult>`
+- `referenceResolve(uuid, { limit? }?) -> Promise<DocQueryReferenceResolveResult>`
 
 ### Jobs
 
@@ -140,18 +142,15 @@ Tier 2:
 
 - `POST /v1/projects`
 - `GET /v1/projects`
-- `GET /v1/projects/{id}`
-- `DELETE /v1/projects/{id}`
+- `DELETE /v1/projects/{project_id}`
 - `POST /v1/projects/{project_id}/sheets`
-- `GET /v1/projects/{project_id}/jobs/{job_id}`
-- `GET /v1/projects/{project_id}/sheets`
-- `GET /v1/projects/{project_id}/sheets/{sheet_id}`
-- `GET /v1/projects/{project_id}/sheets/{sheet_id}/annotations`
 - `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
-- `POST /v1/projects/{project_id}/search`
-- `GET /v1/projects/{project_id}/entities`
-- `GET /v1/projects/{project_id}/entities/{entity_id}`
-- `GET /v1/projects/{project_id}/relationships`
+- `GET /v1/projects/{project_id}/jobs/{job_id}`
+- `GET /v1/projects/{project_id}/docquery/node-get`
+- `GET /v1/projects/{project_id}/docquery/sheet-entities`
+- `GET /v1/projects/{project_id}/docquery/search`
+- `GET /v1/projects/{project_id}/docquery/neighbors`
+- `POST /v1/projects/{project_id}/docquery/cypher`
 
 ## License
 

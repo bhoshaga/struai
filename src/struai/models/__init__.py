@@ -1,6 +1,19 @@
 """StruAI SDK models."""
 
 from .common import BBox, Dimensions, Point, TextSpan
+from .docquery import (
+    DocQueryCypherResult,
+    DocQueryNeighbor,
+    DocQueryNeighborsResult,
+    DocQueryNodeGetResult,
+    DocQueryReferenceResolveResult,
+    DocQuerySearchHit,
+    DocQuerySearchResult,
+    DocQuerySheetEntitiesResult,
+    DocQuerySheetListResult,
+    DocQuerySheetSummaryResult,
+    DocQuerySummary,
+)
 from .drawings import (
     Annotations,
     DetailTag,
@@ -13,15 +26,6 @@ from .drawings import (
     SectionTag,
     TitleBlock,
 )
-from .entities import (
-    Entity,
-    EntityListItem,
-    EntityListResponse,
-    EntityLocation,
-    EntityRelation,
-    Fact,
-    RelationshipListResponse,
-)
 from .projects import (
     JobStatus,
     JobStatusEvent,
@@ -31,21 +35,9 @@ from .projects import (
     Project,
     ProjectDeleteResult,
     ProjectListResponse,
-    SheetAnnotations,
     SheetDeleteResult,
-    SheetDetail,
     SheetIngestResponse,
     SheetResult,
-    SheetSummary,
-)
-from .search import (
-    CommunitySearchHit,
-    ConnectedEntity,
-    EntitySearchHit,
-    FactSearchHit,
-    GraphContext,
-    RelationshipSummary,
-    SearchResponse,
 )
 
 __all__ = [
@@ -66,9 +58,6 @@ __all__ = [
     "Project",
     "ProjectListResponse",
     "ProjectDeleteResult",
-    "SheetSummary",
-    "SheetDetail",
-    "SheetAnnotations",
     "SheetDeleteResult",
     "SheetResult",
     "SheetIngestResponse",
@@ -77,18 +66,15 @@ __all__ = [
     "JobStatusEvent",
     "JobStepTiming",
     "JobStepRef",
-    "SearchResponse",
-    "EntitySearchHit",
-    "FactSearchHit",
-    "CommunitySearchHit",
-    "ConnectedEntity",
-    "GraphContext",
-    "RelationshipSummary",
-    "Entity",
-    "EntityListItem",
-    "EntityListResponse",
-    "EntityRelation",
-    "EntityLocation",
-    "Fact",
-    "RelationshipListResponse",
+    "DocQuerySummary",
+    "DocQueryNodeGetResult",
+    "DocQuerySheetEntitiesResult",
+    "DocQuerySearchHit",
+    "DocQuerySearchResult",
+    "DocQueryNeighbor",
+    "DocQueryNeighborsResult",
+    "DocQueryCypherResult",
+    "DocQuerySheetSummaryResult",
+    "DocQuerySheetListResult",
+    "DocQueryReferenceResolveResult",
 ]

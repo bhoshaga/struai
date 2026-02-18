@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Async SDK workflow example (Tier 1 + Tier 2)."""
+"""Async SDK workflow example (Tier 1 + Tier 2 projects/docquery)."""
 
 from __future__ import annotations
 
@@ -65,15 +65,27 @@ async def _run(args: argparse.Namespace) -> int:
             sheet_result = await ingest.wait(timeout=180, poll_interval=2)
         print(f"sheet_id={sheet_result.sheet_id}")
 
-        search = await project.search("beam connection", limit=5)
+        sheet_list = await project.docquery.sheet_list()
         print(
-            f"search entities={len(search.entities)} "
-            f"facts={len(search.facts)} communities={len(search.communities)}"
+            "sheet_list "
+            f"sheet_node_count={sheet_list.totals.get('sheet_node_count', 0)} "
+            f"mismatch_warnings={len(sheet_list.mismatch_warnings)}"
         )
+
+        search = await project.docquery.search("beam connection", limit=5)
+        print(f"docquery_search_count={search.count}")
+
+        if sheet_result.sheet_id:
+            summary = await project.docquery.sheet_summary(sheet_result.sheet_id, orphan_limit=10)
+            print(
+                "sheet_summary "
+                f"unreachable_non_sheet={summary.reachability.get('unreachable_non_sheet', 0)} "
+                f"warnings={len(summary.warnings)}"
+            )
 
         if args.cleanup:
             deleted = await project.delete()
-            print(f"project_deleted={deleted.deleted} id={deleted.id}")
+            print(f"project_deleted={deleted.deleted} project_id={deleted.project_id}")
         else:
             print(f"kept_project_id={project.id}")
 

@@ -6,7 +6,7 @@ Usage:
 
 Optional:
   STRUAI_PDF=/path/to.pdf STRUAI_PAGE=12   # ingest sheet(s)
-  STRUAI_SEARCH="GB18x18"                 # run search
+  STRUAI_SEARCH="GB18x18"                 # run docquery search
 """
 
 from __future__ import annotations
@@ -32,17 +32,20 @@ def main() -> None:
     api_key = os.getenv("STRUAI_API_KEY", "windowseat")
     client = StruAI(api_key=api_key, base_url=base_url)
 
-    projects = client.projects.list(limit=1)
+    projects = client.projects.list()
     if projects:
-        project = client.projects.get(projects[0].id)
+        project = client.projects.open(projects[0].id, name=projects[0].name)
         created = False
     else:
         project = client.projects.create(name="Smoke Test Project")
         created = True
 
-    entities = project.entities.list(limit=1)
-    relationships = project.relationships.list(limit=1)
-    print(f"project={project.id} entities={len(entities)} relationships={len(relationships)}")
+    sheet_list = project.docquery.sheet_list()
+    print(
+        f"project={project.id} "
+        f"sheet_nodes={sheet_list.totals.get('sheet_node_count', 0)} "
+        f"mismatches={len(sheet_list.mismatch_warnings)}"
+    )
 
     pdf_path = os.getenv("STRUAI_PDF")
     if pdf_path:
@@ -53,15 +56,8 @@ def main() -> None:
 
     search_query = os.getenv("STRUAI_SEARCH")
     if search_query:
-        results = project.search(query=search_query, limit=3)
-        print(
-            "search entities="
-            f"{len(results.entities)} "
-            "facts="
-            f"{len(results.facts)} "
-            "communities="
-            f"{len(results.communities)}"
-        )
+        results = project.docquery.search(query=search_query, limit=3)
+        print(f"search_count={results.count}")
 
     if created:
         project.delete()

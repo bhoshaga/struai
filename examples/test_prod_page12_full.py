@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Portable end-to-end Tier 1 + Tier 2 SDK workflow example."""
+"""Portable end-to-end Tier 1 + Tier 2 projects/docquery SDK workflow example."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 import os
 import time
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 from struai import StruAI
 
@@ -38,7 +38,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--query",
         default="beam connection",
-        help="Search query to run after ingestion",
+        help="DocQuery search text after ingestion",
     )
     parser.add_argument(
         "--timeout",
@@ -77,6 +77,15 @@ def _wait_ingest(result_or_batch: Any, timeout: float, poll_interval: float):
     return result_or_batch.wait(timeout=timeout, poll_interval=poll_interval)
 
 
+def _first_hit_uuid(search_payload: Any) -> Optional[str]:
+    for hit in search_payload.hits:
+        node = hit.node or {}
+        uuid = node.get("properties", {}).get("uuid")
+        if uuid:
+            return str(uuid)
+    return None
+
+
 def main() -> int:
     args = _parse_args()
 
@@ -107,7 +116,7 @@ def main() -> int:
 
     print(f"drawing_id={drawing.id} page={drawing.page} processing_ms={drawing.processing_ms}")
 
-    print("\n== Tier 2: Projects ==")
+    print("\n== Tier 2: Projects + DocQuery ==")
     project_name = f"SDK Workflow {int(time.time())}"
     project = client.projects.create(
         name=project_name,
@@ -115,11 +124,11 @@ def main() -> int:
     )
     print(f"project_created id={project.id} name={project.name}")
 
-    projects: List[Any] = client.projects.list(limit=5)
+    projects: List[Any] = client.projects.list()
     print(f"projects_list_count={len(projects)}")
 
-    fetched_project = client.projects.get(project.id)
-    print(f"project_get id={fetched_project.id} description={fetched_project.description}")
+    opened_project = client.projects.open(project.id)
+    print(f"project_open id={opened_project.id} name={opened_project.name}")
 
     if cache.cached:
         ingest = project.sheets.add(
@@ -147,54 +156,63 @@ def main() -> int:
         f"relationships_created={sheet_result.relationships_created}"
     )
 
-    sheets = project.sheets.list(limit=10)
-    print(f"sheets_list_count={len(sheets)}")
-
     if not sheet_result.sheet_id:
-        print("No sheet_id returned from ingest; skipping sheet detail calls.")
+        print("No sheet_id returned from ingest; skipping sheet-scoped docquery calls.")
         target_sheet_id = None
     else:
         target_sheet_id = sheet_result.sheet_id
 
     if target_sheet_id:
-        sheet = project.sheets.get(target_sheet_id)
-        print(f"sheet_get id={sheet.id} page={sheet.page} regions={len(sheet.regions)}")
+        sheet_entities = project.docquery.sheet_entities(target_sheet_id, limit=20)
+        print(f"sheet_entities_count={sheet_entities.count}")
 
-        annotations = project.sheets.get_annotations(target_sheet_id)
+        sheet_summary = project.docquery.sheet_summary(target_sheet_id, orphan_limit=10)
         print(
-            "sheet_annotations leaders="
-            f"{len(annotations.annotations.get('leaders', []))} "
-            "section_tags="
-            f"{len(annotations.annotations.get('section_tags', []))}"
+            "sheet_summary "
+            f"unreachable_non_sheet={sheet_summary.reachability.get('unreachable_non_sheet', 0)} "
+            f"warnings={len(sheet_summary.warnings)}"
         )
 
-    search = project.search(
-        query=args.query,
-        limit=5,
-        channels=["entities", "facts", "communities"],
-        include_graph_context=True,
-    )
+    sheet_list = project.docquery.sheet_list()
     print(
-        f"search entities={len(search.entities)} facts={len(search.facts)} "
-        f"communities={len(search.communities)} search_ms={search.search_ms}"
+        "sheet_list "
+        f"sheet_node_count={sheet_list.totals.get('sheet_node_count', 0)} "
+        f"mismatch_warnings={len(sheet_list.mismatch_warnings)}"
     )
 
-    entities = project.entities.list(limit=5, type="component_instance")
-    print(f"entities_list_count={len(entities)}")
-    if entities:
-        entity = project.entities.get(entities[0].id, include_invalid=False, expand_target=True)
-        print(f"entity_get id={entity.id} label={entity.label} outgoing={len(entity.outgoing)}")
+    search = project.docquery.search(args.query, limit=5)
+    print(f"docquery_search_count={search.count}")
 
-    relationships = project.relationships.list(limit=5, include_invalid=False)
-    print(f"relationships_list_count={len(relationships)}")
+    first_uuid = _first_hit_uuid(search)
+    if first_uuid:
+        node_payload = project.docquery.node_get(first_uuid)
+        print(f"node_get_found={node_payload.found} uuid={first_uuid}")
+
+        neighbors = project.docquery.neighbors(first_uuid, direction="both", limit=10)
+        print(f"neighbors_count={neighbors.count}")
+
+        resolved = project.docquery.reference_resolve(first_uuid, limit=10)
+        print(
+            f"reference_resolve_found={resolved.found} "
+            f"resolved_count={resolved.count} warnings={len(resolved.warnings)}"
+        )
+    else:
+        print("No search hit UUID found; skipping node/neighbors/reference-resolve.")
+
+    cypher = project.docquery.cypher(
+        "MATCH (n:Entity {project_id:$project_id}) RETURN count(n) AS total_entities",
+        max_rows=1,
+    )
+    total_entities = cypher.records[0].get("total_entities") if cypher.records else 0
+    print(f"cypher_total_entities={total_entities}")
 
     if args.cleanup:
         if target_sheet_id:
             deleted_sheet = project.sheets.delete(target_sheet_id)
             print(f"sheet_deleted={deleted_sheet.deleted} sheet_id={deleted_sheet.sheet_id}")
 
-        deleted_project = fetched_project.delete()
-        print(f"project_deleted={deleted_project.deleted} project_id={deleted_project.id}")
+        deleted_project = opened_project.delete()
+        print(f"project_deleted={deleted_project.deleted} project_id={deleted_project.project_id}")
     else:
         print(f"kept_project_id={project.id}")
 

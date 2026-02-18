@@ -1,27 +1,22 @@
-"""Tier 2: project, sheet, and job models."""
+"""Tier 2: project, sheet ingest, and job models."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from .common import BBox, Dimensions, SDKBaseModel
-from .drawings import TitleBlock
+from .common import SDKBaseModel
 
 
 class Project(SDKBaseModel):
-    """Project metadata."""
+    """Project metadata returned by /v1/projects and /v1/projects create."""
 
     id: str
     name: str
     description: Optional[str] = None
     created_at: Optional[datetime] = None
-    sheet_count: Optional[int] = None
-    entity_count: Optional[int] = None
-    rel_count: Optional[int] = None
-    community_count: Optional[int] = None
 
 
 class ProjectListResponse(SDKBaseModel):
@@ -31,138 +26,26 @@ class ProjectListResponse(SDKBaseModel):
 
 
 class ProjectDeleteResult(SDKBaseModel):
-    """Response for DELETE /v1/projects/{id}."""
+    """Response for DELETE /v1/projects/{project_id}."""
 
     deleted: bool
-    id: str
-
-
-class SheetSummary(SDKBaseModel):
-    """Summary from GET /v1/projects/{id}/sheets."""
-
-    id: str
-    sheet_uuid: Optional[str] = None
-    title: Optional[str] = None
-    revision: Optional[str] = None
-    page: Optional[int] = None
-    width: Optional[float] = None
-    height: Optional[float] = None
-    mention_count: Optional[int] = None
-    component_instance_count: Optional[int] = None
-    region_count: Optional[int] = None
-    created_at: Optional[datetime] = None
-
-
-class SheetListResponse(SDKBaseModel):
-    """Response for GET /v1/projects/{id}/sheets."""
-
     project_id: str
-    sheets: List[SheetSummary] = Field(default_factory=list)
-
-
-class SheetRegion(SDKBaseModel):
-    """Region listed in sheet detail."""
-
-    id: str
-    type: Optional[str] = None
-    label: Optional[str] = None
-    category: Optional[str] = None
-    description: Optional[str] = None
-    bbox: Optional[BBox] = None
-
-
-class SheetMention(SDKBaseModel):
-    """Mention listed in sheet detail."""
-
-    id: str
-    type: Optional[str] = None
-    label: Optional[str] = None
-    text: Optional[str] = None
-    description: Optional[str] = None
-    bbox: Optional[BBox] = None
-    region_id: Optional[str] = None
-    attributes: Optional[Union[Dict[str, Any], List[Any], str]] = None
-    provenance: Optional[Union[Dict[str, Any], List[Any], str]] = None
-
-
-class SheetComponentInstance(SDKBaseModel):
-    """Component instance listed in sheet detail."""
-
-    id: str
-    label: Optional[str] = None
-    family: Optional[str] = None
-    material: Optional[str] = None
-    discipline: Optional[str] = None
-    bbox: Optional[BBox] = None
-    region_id: Optional[str] = None
-    component_type_uuid: Optional[str] = None
-    resolution_state: Optional[str] = None
-    resolution_reason: Optional[str] = None
-
-
-class SheetReference(SDKBaseModel):
-    """Reference listed in sheet detail."""
-
-    id: str
-    source_id: Optional[str] = None
-    target_sheet_id: Optional[str] = None
-    target_sheet_uuid: Optional[str] = None
-    target_unresolved: Optional[bool] = None
-    fact: Optional[str] = None
-    target_detail: Optional[str] = None
-
-
-class SheetDetail(SDKBaseModel):
-    """Detailed sheet payload from GET /v1/projects/{id}/sheets/{sheet_id}."""
-
-    id: str
-    sheet_uuid: Optional[str] = None
-    title: Optional[str] = None
-    revision: Optional[str] = None
-    page: Optional[int] = None
-    width: Optional[float] = None
-    height: Optional[float] = None
-    regions: List[SheetRegion] = Field(default_factory=list)
-    mentions: List[SheetMention] = Field(default_factory=list)
-    component_instances: List[SheetComponentInstance] = Field(default_factory=list)
-    references: List[SheetReference] = Field(default_factory=list)
-
-
-class SheetAnnotations(SDKBaseModel):
-    """Raw annotations for a sheet."""
-
-    sheet_id: str
-    page: int
-    dimensions: Dimensions
-    annotations: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
-    titleblock: Optional[TitleBlock] = None
-
-
-class SheetDeleteCleanup(SDKBaseModel):
-    """Cleanup section from sheet deletion response."""
-
-    deleted_nodes: int = 0
-    deleted_fact_uuids: List[str] = Field(default_factory=list)
-    deleted_reference_uuids: List[str] = Field(default_factory=list)
-
-
-class SheetDeleteMaintenance(SDKBaseModel):
-    """Maintenance section from sheet deletion response."""
-
-    community_mode: Optional[str] = None
-    semantic_index_mode: Optional[str] = None
-    communities_count: Optional[int] = None
-    semantic_points_upserted: Optional[int] = None
-    semantic_points_deleted: Optional[int] = None
+    projects_deleted: Optional[int] = None
+    nodes_deleted: Optional[int] = None
+    relationships_deleted: Optional[int] = None
+    owner_mapping_deleted: Optional[bool] = None
+    qdrant_deleted_points: Optional[int] = None
 
 
 class SheetDeleteResult(SDKBaseModel):
-    """Response for DELETE /v1/projects/{id}/sheets/{sheet_id}."""
+    """Response for DELETE /v1/projects/{project_id}/sheets/{sheet_id}."""
 
     deleted: bool
+    project_id: str
     sheet_id: str
-    cleanup: Optional[SheetDeleteCleanup] = None
-    maintenance: Optional[SheetDeleteMaintenance] = None
+    nodes_deleted: Optional[int] = None
+    relationships_deleted_by_source_sheet: Optional[int] = None
+    qdrant: Optional[Dict[str, Any]] = None
 
 
 class JobSummary(SDKBaseModel):
@@ -173,7 +56,7 @@ class JobSummary(SDKBaseModel):
 
 
 class SheetIngestResponse(SDKBaseModel):
-    """Response for POST /v1/projects/{id}/sheets."""
+    """Response for POST /v1/projects/{project_id}/sheets."""
 
     jobs: List[JobSummary] = Field(default_factory=list)
 
@@ -217,7 +100,7 @@ class JobStatusEvent(SDKBaseModel):
 
 
 class JobStatus(SDKBaseModel):
-    """Current job status from GET /v1/projects/{id}/jobs/{job_id}."""
+    """Current job status from GET /v1/projects/{project_id}/jobs/{job_id}."""
 
     job_id: str
     page: Optional[int] = None

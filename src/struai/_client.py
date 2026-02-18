@@ -33,7 +33,7 @@ class StruAI(BaseClient):
         >>> project = client.projects.create("Building A")
         >>> job = project.sheets.add("structural.pdf", page=4)
         >>> job.wait()
-        >>> results = project.search("W12x26 beam connections")
+        >>> hits = project.docquery.search("W12x26 beam connections", limit=5)
     """
 
     def __init__(
@@ -65,7 +65,7 @@ class StruAI(BaseClient):
 
     @cached_property
     def projects(self) -> Projects:
-        """Tier 2: Graph + Search API."""
+        """Tier 2: project ingest and DocQuery traversal API."""
         return Projects(self)
 
 
@@ -111,5 +111,5 @@ class AsyncStruAI(AsyncBaseClient):
 
     @cached_property
     def projects(self) -> AsyncProjects:
-        """Tier 2: Graph + Search API."""
+        """Tier 2: project ingest and DocQuery traversal API."""
         return AsyncProjects(self)

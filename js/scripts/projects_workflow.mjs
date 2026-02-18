@@ -1,5 +1,5 @@
 /**
- * Full Tier 1 + Tier 2 workflow example.
+ * Full Tier 1 + Tier 2 projects/docquery workflow example.
  *
  * Usage:
  *   npm run build
@@ -52,18 +52,18 @@ const drawing = cache.cached
   : await client.drawings.analyze(pdfPath, { page });
 console.log(`drawing_id=${drawing.id} page=${drawing.page} processing_ms=${drawing.processing_ms}`);
 
-console.log('\n== Tier 2: Projects ==');
+console.log('\n== Tier 2: Projects + DocQuery ==');
 const project = await client.projects.create({
   name: `JS SDK Workflow ${Date.now()}`,
   description: `Created from ${path.basename(pdfPath)} page ${page}`,
 });
 console.log(`project_created id=${project.id} name=${project.name}`);
 
-const projects = await client.projects.list({ limit: 5 });
+const projects = await client.projects.list();
 console.log(`projects_list_count=${projects.length}`);
 
-const fetchedProject = await client.projects.get(project.id);
-console.log(`project_get id=${fetchedProject.id} description=${fetchedProject.description ?? ''}`);
+const openedProject = client.projects.open(project.id);
+console.log(`project_open id=${openedProject.id} name=${openedProject.name}`);
 
 const jobOrBatch = cache.cached
   ? await project.sheets.add(null, {
@@ -100,51 +100,53 @@ console.log(
     `relationships_created=${sheetResult.relationships_created ?? 0}`
 );
 
-const sheets = await project.sheets.list({ limit: 10 });
-console.log(`sheets_list_count=${sheets.length}`);
+if (sheetResult.sheet_id) {
+  const sheetEntities = await project.docquery.sheetEntities(sheetResult.sheet_id, { limit: 20 });
+  console.log(`sheet_entities_count=${sheetEntities.count}`);
 
-const targetSheetId = sheetResult.sheet_id;
-if (targetSheetId) {
-  const sheet = await project.sheets.get(targetSheetId);
-  console.log(`sheet_get id=${sheet.id} page=${sheet.page ?? ''} regions=${sheet.regions.length}`);
-
-  const annotations = await project.sheets.getAnnotations(targetSheetId);
+  const sheetSummary = await project.docquery.sheetSummary(sheetResult.sheet_id, { orphanLimit: 10 });
   console.log(
-    `sheet_annotations leaders=${(annotations.annotations.leaders ?? []).length} ` +
-      `section_tags=${(annotations.annotations.section_tags ?? []).length}`
+    `sheet_summary unreachable_non_sheet=${sheetSummary.reachability.unreachable_non_sheet ?? 0} ` +
+      `warnings=${sheetSummary.warnings.length}`
   );
 }
 
-const search = await project.search(query, {
-  limit: 5,
-  channels: ['entities', 'facts', 'communities'],
-  includeGraphContext: true,
-});
+const sheetList = await project.docquery.sheetList();
 console.log(
-  `search entities=${search.entities.length} facts=${search.facts.length} ` +
-    `communities=${search.communities.length} search_ms=${search.search_ms}`
+  `sheet_list sheet_node_count=${sheetList.totals.sheet_node_count ?? 0} ` +
+    `mismatch_warnings=${sheetList.mismatch_warnings.length}`
 );
 
-const entities = await project.entities.list({ limit: 5, type: 'component_instance' });
-console.log(`entities_list_count=${entities.length}`);
-if (entities.length > 0) {
-  const entity = await project.entities.get(entities[0].id, {
-    includeInvalid: false,
-    expandTarget: true,
-  });
-  console.log(`entity_get id=${entity.id} label=${entity.label} outgoing=${entity.outgoing.length}`);
+const search = await project.docquery.search(query, { limit: 5 });
+console.log(`docquery_search_count=${search.count}`);
+
+const firstUuid = search.hits.find((hit) => hit.node?.properties?.uuid)?.node?.properties?.uuid;
+if (typeof firstUuid === 'string' && firstUuid) {
+  const node = await project.docquery.nodeGet(firstUuid);
+  console.log(`node_get_found=${node.found} uuid=${firstUuid}`);
+
+  const neighbors = await project.docquery.neighbors(firstUuid, { direction: 'both', limit: 10 });
+  console.log(`neighbors_count=${neighbors.count}`);
+
+  const resolved = await project.docquery.referenceResolve(firstUuid, { limit: 10 });
+  console.log(`reference_resolve_found=${resolved.found} resolved_count=${resolved.count}`);
+} else {
+  console.log('No search hit UUID found; skipping node/neighbors/reference-resolve.');
 }
 
-const relationships = await project.relationships.list({ limit: 5, includeInvalid: false });
-console.log(`relationships_list_count=${relationships.length}`);
+const cypher = await project.docquery.cypher(
+  'MATCH (n:Entity {project_id:$project_id}) RETURN count(n) AS total_entities',
+  { maxRows: 1 }
+);
+console.log(`cypher_total_entities=${cypher.records[0]?.total_entities ?? 0}`);
 
 if (cleanup) {
-  if (targetSheetId) {
-    const deletedSheet = await project.sheets.delete(targetSheetId);
+  if (sheetResult.sheet_id) {
+    const deletedSheet = await project.sheets.delete(sheetResult.sheet_id);
     console.log(`sheet_deleted=${deletedSheet.deleted} sheet_id=${deletedSheet.sheet_id}`);
   }
-  const deletedProject = await fetchedProject.delete();
-  console.log(`project_deleted=${deletedProject.deleted} project_id=${deletedProject.id}`);
+  const deletedProject = await openedProject.delete();
+  console.log(`project_deleted=${deletedProject.deleted} project_id=${deletedProject.project_id}`);
 } else {
   console.log(`kept_project_id=${project.id}`);
 }

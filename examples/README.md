@@ -17,7 +17,7 @@ export STRUAI_PDF=/absolute/path/to/structural.pdf
 # Tier 1 drawings flow
 python3 test_prod_page12.py --page 12
 
-# Full Tier 1 + Tier 2 workflow
+# Full Tier 1 + Tier 2 projects/docquery workflow
 python3 test_prod_page12_full.py --page 12
 
 # Full workflow + cleanup

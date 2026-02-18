@@ -13,23 +13,22 @@ const apiKey = process.env.STRUAI_API_KEY ?? 'windowseat';
 
 const client = new StruAI({ apiKey, baseUrl });
 
-const projects = await client.projects.list({ limit: 1 });
+const projects = await client.projects.list();
 let project;
 let created = false;
 if (projects.length > 0) {
-  project = await client.projects.get(projects[0].id);
+  project = client.projects.open(projects[0].id, { name: projects[0].name });
 } else {
   project = await client.projects.create({ name: 'Smoke Test Project' });
   created = true;
 }
 
-const entities = await project.entities.list({ limit: 1 });
-const relationships = await project.relationships.list({ limit: 1 });
-const search = await project.search('beam', { limit: 3 });
+const topology = await project.docquery.sheetList();
+const search = await project.docquery.search('beam', { limit: 3 });
 
 console.log(
-  `project=${project.id} entities=${entities.length} relationships=${relationships.length} ` +
-    `search_entities=${search.entities.length} search_facts=${search.facts.length}`
+  `project=${project.id} sheet_nodes=${topology.totals.sheet_node_count ?? 0} ` +
+    `mismatches=${topology.mismatch_warnings.length} search_count=${search.count}`
 );
 
 if (created) {
