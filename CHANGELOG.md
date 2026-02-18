@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-02-18)
+
+### Features
+
+- Hard-cut SDK to docquery traversal contract
+  ([`42b5aeb`](https://github.com/bhoshaga/struai/commit/42b5aeb6ef8013c99a563d933c23748e79c296d6))
+
+
 ## v1.3.1 (2026-02-08)
 
 ### Bug Fixes
