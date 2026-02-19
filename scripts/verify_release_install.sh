@@ -90,7 +90,7 @@ node --input-type=module <<'JS'
 import { StruAI } from 'struai';
 
 const client = new StruAI({
-  apiKey: process.env.STRUAI_API_KEY || 'windowseat',
+  apiKey: process.env.STRUAI_API_KEY || 'TEST_API_KEY',
   baseUrl: process.env.STRUAI_BASE_URL || 'http://localhost:8000',
 });
 

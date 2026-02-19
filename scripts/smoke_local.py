@@ -1,7 +1,7 @@
 """Local smoke test for StruAI Python SDK.
 
 Usage:
-  STRUAI_API_KEY=windowseat STRUAI_BASE_URL=http://localhost:8000 \
+  STRUAI_API_KEY=YOUR_API_KEY STRUAI_BASE_URL=http://localhost:8000 \
     python3 scripts/smoke_local.py
 
 Optional:
@@ -29,7 +29,9 @@ def _wait_ingest(result_or_batch):
 
 def main() -> None:
     base_url = os.getenv("STRUAI_BASE_URL", "http://localhost:8000")
-    api_key = os.getenv("STRUAI_API_KEY", "windowseat")
+    api_key = os.getenv("STRUAI_API_KEY")
+    if not api_key:
+        raise SystemExit("Missing STRUAI_API_KEY")
     client = StruAI(api_key=api_key, base_url=base_url)
 
     projects = client.projects.list()

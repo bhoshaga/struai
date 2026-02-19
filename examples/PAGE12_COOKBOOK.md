@@ -19,17 +19,21 @@ npm install struai
 ## Environment
 
 ```bash
-export STRUAI_API_KEY=windowseat
+export STRUAI_API_KEY=YOUR_API_KEY
 export STRUAI_BASE_URL=https://api.stru.ai
 ```
 
 ## Python: All 10 Operations
 
 ```python
+import os
 from pathlib import Path
 from struai import StruAI
 
-client = StruAI(api_key="windowseat", base_url="https://api.stru.ai")
+client = StruAI(
+    api_key=os.environ["STRUAI_API_KEY"],
+    base_url=os.environ.get("STRUAI_BASE_URL", "https://api.stru.ai"),
+)
 project = client.projects.open("proj_86c0f02e")
 sheet_id = "S111"
 
@@ -101,8 +105,11 @@ print("crop_bbox:", crop_bbox.output_path, crop_bbox.bytes_written, crop_bbox.co
 ```js
 import { StruAI } from "struai";
 
+const apiKey = process.env.STRUAI_API_KEY;
+if (!apiKey) throw new Error("Set STRUAI_API_KEY");
+
 const client = new StruAI({
-  apiKey: process.env.STRUAI_API_KEY || "windowseat",
+  apiKey,
   baseUrl: process.env.STRUAI_BASE_URL || "https://api.stru.ai",
 });
 
