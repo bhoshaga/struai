@@ -18,6 +18,9 @@ export STRUAI_PDF=/absolute/path/to/structural.pdf
 ## Scripts
 
 ```bash
+# Runnable Page-12 cookbook (DocQuery traversal + crop)
+python3 page12_cookbook.py
+
 # Tier 1 drawings flow
 python3 test_prod_page12.py --page 12
 

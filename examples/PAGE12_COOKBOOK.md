@@ -2,6 +2,14 @@
 
 This cookbook shows end-to-end DocQuery traversal on structural page 12, including `cypher` and server-side `crop`.
 
+## Runnable Script (Python)
+
+```bash
+export STRUAI_API_KEY=YOUR_API_KEY
+export STRUAI_BASE_URL=https://api.stru.ai
+python3 examples/page12_cookbook.py
+```
+
 ## Target Context
 
 - PDF: `/Users/bhoshaga/PycharmProjects/stru/drawing_pipeline/sample-pdf/structural-compiled.pdf`
