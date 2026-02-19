@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v2.2.0 (2026-02-19)
+
+### Documentation
+
+- Add page-12 cookbook with full docquery examples
+  ([`6aeef85`](https://github.com/bhoshaga/struai/commit/6aeef857d6b81e89486d015c203b74550a486b81))
+
+### Features
+
+- Align Python and JS SDKs to v3 DocQuery contract
+  ([`eb5c28d`](https://github.com/bhoshaga/struai/commit/eb5c28d22a5f3bb0edf0321d30c593ee15b9e50f))
+
+
 ## Unreleased
 
 ### Breaking Changes
