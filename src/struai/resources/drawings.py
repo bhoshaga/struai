@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, Optional, Tuple, Union
 
 from .._exceptions import NotFoundError
-from ..models.drawings import DrawingCacheStatus, DrawingDeleteResult, DrawingResult
+from ..models.drawings import DrawingCacheStatus, DrawingResult
 
 if TYPE_CHECKING:
     from .._base import AsyncBaseClient, BaseClient
@@ -76,14 +76,6 @@ class Drawings:
         """Check PDF cache status for a file hash."""
         return self._client.get(f"/drawings/cache/{file_hash}", cast_to=DrawingCacheStatus)
 
-    def get(self, drawing_id: str) -> DrawingResult:
-        """Get drawing by ID."""
-        return self._client.get(f"/drawings/{drawing_id}", cast_to=DrawingResult)
-
-    def delete(self, drawing_id: str) -> DrawingDeleteResult:
-        """Delete drawing by ID."""
-        return self._client.delete(f"/drawings/{drawing_id}", cast_to=DrawingDeleteResult)
-
     def compute_file_hash(self, file: Uploadable) -> str:
         """Compute server-compatible file hash (sha256 first 16 chars)."""
         return _compute_file_hash(file)
@@ -141,14 +133,6 @@ class AsyncDrawings:
     async def check_cache(self, file_hash: str) -> DrawingCacheStatus:
         """Check PDF cache status for a file hash."""
         return await self._client.get(f"/drawings/cache/{file_hash}", cast_to=DrawingCacheStatus)
-
-    async def get(self, drawing_id: str) -> DrawingResult:
-        """Get drawing by ID."""
-        return await self._client.get(f"/drawings/{drawing_id}", cast_to=DrawingResult)
-
-    async def delete(self, drawing_id: str) -> DrawingDeleteResult:
-        """Delete drawing by ID."""
-        return await self._client.delete(f"/drawings/{drawing_id}", cast_to=DrawingDeleteResult)
 
     def compute_file_hash(self, file: Uploadable) -> str:
         """Compute server-compatible file hash (sha256 first 16 chars)."""

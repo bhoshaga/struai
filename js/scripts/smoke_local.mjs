@@ -28,7 +28,7 @@ const search = await project.docquery.search('beam', { limit: 3 });
 
 console.log(
   `project=${project.id} sheet_nodes=${topology.totals.sheet_node_count ?? 0} ` +
-    `mismatches=${topology.mismatch_warnings.length} search_count=${search.count}`
+    `mismatches=${topology.mismatch_warnings.length} search_count=${search.hits.length}`
 );
 
 if (created) {

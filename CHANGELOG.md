@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## Unreleased
+
+### Breaking Changes
+
+- Hard-cut SDK contracts to current drawing router API:
+  - Removed Tier 1 `drawings.get` / `drawings.delete` in Python and JS.
+  - Switched DocQuery routes to `/projects/{project_id}/{command}` (removed `/docquery` prefix).
+  - Updated node/sheet/search/neighbors/cypher result models to slim payload contract.
+  - Replaced local crop pipeline with server-side `POST /v1/projects/{project_id}/crop` PNG flow.
+- Updated cookbook/examples/tests to the new contract and response shapes.
+
 ## v2.1.0 (2026-02-18)
 
 ### Features

@@ -11,7 +11,7 @@
  *   STRUAI_CLEANUP=1 node scripts/projects_workflow.mjs
  *
  * Optional crop demo:
- *   STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png STRUAI_CROP_OUTPUT=/tmp/crop.png node scripts/projects_workflow.mjs
+ *   STRUAI_CROP_OUTPUT=/tmp/crop.png node scripts/projects_workflow.mjs
  */
 
 import fs from 'node:fs/promises';
@@ -24,7 +24,6 @@ const pdfPath = process.env.STRUAI_PDF;
 const page = Number(process.env.STRUAI_PAGE ?? '12');
 const query = process.env.STRUAI_QUERY ?? 'beam connection';
 const cleanup = process.env.STRUAI_CLEANUP === '1';
-const cropImage = process.env.STRUAI_CROP_IMAGE;
 const cropOutput = process.env.STRUAI_CROP_OUTPUT ?? 'sdk_crop_js.png';
 const timeoutMs = Number(process.env.STRUAI_TIMEOUT_MS ?? '240000');
 const pollIntervalMs = Number(process.env.STRUAI_POLL_INTERVAL_MS ?? '2000');
@@ -107,7 +106,7 @@ console.log(
 
 if (sheetResult.sheet_id) {
   const sheetEntities = await project.docquery.sheetEntities(sheetResult.sheet_id, { limit: 20 });
-  console.log(`sheet_entities_count=${sheetEntities.count}`);
+  console.log(`sheet_entities_count=${sheetEntities.entities.length}`);
 
   const sheetSummary = await project.docquery.sheetSummary(sheetResult.sheet_id, { orphanLimit: 10 });
   console.log(
@@ -123,30 +122,31 @@ console.log(
 );
 
 const search = await project.docquery.search(query, { limit: 5 });
-console.log(`docquery_search_count=${search.count}`);
+console.log(`docquery_search_count=${search.hits.length}`);
 
 const firstUuid = search.hits.find((hit) => hit.node?.properties?.uuid)?.node?.properties?.uuid;
 if (typeof firstUuid === 'string' && firstUuid) {
   const node = await project.docquery.nodeGet(firstUuid);
   console.log(`node_get_found=${node.found} uuid=${firstUuid}`);
 
-  const neighbors = await project.docquery.neighbors(firstUuid, { direction: 'both', limit: 10 });
-  console.log(`neighbors_count=${neighbors.count}`);
+  const neighbors = await project.docquery.neighbors(firstUuid, {
+    mode: 'both',
+    direction: 'both',
+    radius: 200,
+    limit: 10,
+  });
+  console.log(`neighbors_count=${neighbors.neighbors.length}`);
 
   const resolved = await project.docquery.referenceResolve(firstUuid, { limit: 10 });
   console.log(`reference_resolve_found=${resolved.found} resolved_count=${resolved.count}`);
 
-  if (cropImage) {
-    const crop = await project.docquery.crop({
-      uuid: firstUuid,
-      image: cropImage,
-      output: cropOutput,
-    });
-    console.log(
-      `crop path=${crop.output_image.path} size=${crop.output_image.width}x${crop.output_image.height} ` +
-        `scale_mode=${crop.transform.scale_mode}`
-    );
-  }
+  const crop = await project.docquery.crop({
+    uuid: firstUuid,
+    output: cropOutput,
+  });
+  console.log(
+    `crop path=${crop.output_path} bytes_written=${crop.bytes_written} content_type=${crop.content_type}`
+  );
 } else {
   console.log('No search hit UUID found; skipping node/neighbors/reference-resolve.');
 }

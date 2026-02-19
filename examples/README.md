@@ -24,9 +24,8 @@ python3 test_prod_page12.py --page 12
 # Full Tier 1 + Tier 2 projects/docquery workflow
 python3 test_prod_page12_full.py --page 12
 
-# Full workflow with crop demo (graph uuid -> image crop)
+# Full workflow with crop demo (server-side graph uuid crop)
 python3 test_prod_page12_full.py --page 12 \
-  --crop-image /absolute/path/to/page_context.png \
   --crop-output /absolute/path/to/crop.png
 
 # Full workflow + cleanup

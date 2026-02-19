@@ -57,7 +57,7 @@ def main() -> None:
     search_query = os.getenv("STRUAI_SEARCH")
     if search_query:
         results = project.docquery.search(query=search_query, limit=3)
-        print(f"search_count={results.count}")
+        print(f"search_count={len(results.hits)}")
 
     if created:
         project.delete()

@@ -21,6 +21,7 @@ from ._exceptions import (
 from ._version import __version__
 
 T = TypeVar("T", bound=BaseModel)
+RequestResult = Union[T, Dict[str, Any], bytes, None]
 
 DEFAULT_BASE_URL = "https://api.stru.ai"
 DEFAULT_TIMEOUT = 60.0
@@ -132,7 +133,8 @@ class BaseClient:
         files: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         cast_to: Optional[Type[T]] = None,
-    ) -> Union[T, Dict[str, Any], None]:
+        expect_bytes: bool = False,
+    ) -> RequestResult:
         """Make HTTP request with retry logic."""
         client = self._get_client()
         last_error: Optional[Exception] = None
@@ -148,7 +150,12 @@ class BaseClient:
 
                 # Handle empty responses (DELETE)
                 if response.status_code == 204 or not response.content:
+                    if expect_bytes:
+                        return b""
                     return None
+
+                if expect_bytes:
+                    return response.content
 
                 result = response.json()
                 if cast_to is not None:
@@ -289,7 +296,8 @@ class AsyncBaseClient:
         files: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         cast_to: Optional[Type[T]] = None,
-    ) -> Union[T, Dict[str, Any], None]:
+        expect_bytes: bool = False,
+    ) -> RequestResult:
         """Make async HTTP request with retry logic."""
         import asyncio
 
@@ -308,7 +316,12 @@ class AsyncBaseClient:
                 self._handle_response_error(response)
 
                 if response.status_code == 204 or not response.content:
+                    if expect_bytes:
+                        return b""
                     return None
+
+                if expect_bytes:
+                    return response.content
 
                 result = response.json()
                 if cast_to is not None:

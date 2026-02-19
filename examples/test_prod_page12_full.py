@@ -58,14 +58,9 @@ def _parse_args() -> argparse.Namespace:
         help="Delete created sheet and project at end",
     )
     parser.add_argument(
-        "--crop-image",
-        default=os.environ.get("STRUAI_CROP_IMAGE"),
-        help="Optional page PNG path for docquery.crop demo",
-    )
-    parser.add_argument(
         "--crop-output",
         default=os.environ.get("STRUAI_CROP_OUTPUT", "sdk_crop.png"),
-        help="Output PNG path for docquery.crop demo (default: sdk_crop.png)",
+        help="Output PNG path for server-side docquery.crop demo (default: sdk_crop.png)",
     )
     return parser.parse_args()
 
@@ -174,7 +169,7 @@ def main() -> int:
 
     if target_sheet_id:
         sheet_entities = project.docquery.sheet_entities(target_sheet_id, limit=20)
-        print(f"sheet_entities_count={sheet_entities.count}")
+        print(f"sheet_entities_count={len(sheet_entities.entities)}")
 
         sheet_summary = project.docquery.sheet_summary(target_sheet_id, orphan_limit=10)
         print(
@@ -191,15 +186,21 @@ def main() -> int:
     )
 
     search = project.docquery.search(args.query, limit=5)
-    print(f"docquery_search_count={search.count}")
+    print(f"docquery_search_count={len(search.hits)}")
 
     first_uuid = _first_hit_uuid(search)
     if first_uuid:
         node_payload = project.docquery.node_get(first_uuid)
         print(f"node_get_found={node_payload.found} uuid={first_uuid}")
 
-        neighbors = project.docquery.neighbors(first_uuid, direction="both", limit=10)
-        print(f"neighbors_count={neighbors.count}")
+        neighbors = project.docquery.neighbors(
+            first_uuid,
+            mode="both",
+            direction="both",
+            radius=200.0,
+            limit=10,
+        )
+        print(f"neighbors_count={len(neighbors.neighbors)}")
 
         resolved = project.docquery.reference_resolve(first_uuid, limit=10)
         print(
@@ -207,18 +208,16 @@ def main() -> int:
             f"resolved_count={resolved.count} warnings={len(resolved.warnings)}"
         )
 
-        if args.crop_image:
-            crop = project.docquery.crop(
-                uuid=first_uuid,
-                image=args.crop_image,
-                output=args.crop_output,
-            )
-            print(
-                "crop "
-                f"path={crop.output_image.get('path')} "
-                f"size={crop.output_image.get('width')}x{crop.output_image.get('height')} "
-                f"scale_mode={crop.transform.get('scale_mode')}"
-            )
+        crop = project.docquery.crop(
+            uuid=first_uuid,
+            output=args.crop_output,
+        )
+        print(
+            "crop "
+            f"path={crop.output_path} "
+            f"bytes_written={crop.bytes_written} "
+            f"content_type={crop.content_type}"
+        )
     else:
         print("No search hit UUID found; skipping node/neighbors/reference-resolve.")
 

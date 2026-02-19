@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import math
 import time
 from functools import cached_property
 from pathlib import Path
@@ -269,177 +268,6 @@ def _parse_bbox_value(
     return x1, y1, x2, y2
 
 
-def _extract_node_bbox(
-    node_payload: DocQueryNodeGetResult,
-) -> Tuple[float, float, float, float, Dict[str, Any]]:
-    if not node_payload.found:
-        raise ValueError("source uuid not found")
-    node = node_payload.node
-    if not isinstance(node, dict):
-        raise ValueError("node-get returned invalid node payload")
-    props = node.get("properties")
-    if not isinstance(props, dict):
-        raise ValueError("node-get returned invalid node properties")
-
-    bbox_min = props.get("bbox_min")
-    bbox_max = props.get("bbox_max")
-    if isinstance(bbox_min, dict) and isinstance(bbox_max, dict):
-        if "x" in bbox_min and "y" in bbox_min and "x" in bbox_max and "y" in bbox_max:
-            return (
-                float(bbox_min["x"]),
-                float(bbox_min["y"]),
-                float(bbox_max["x"]),
-                float(bbox_max["y"]),
-                props,
-            )
-
-    legacy_bbox = props.get("bbox")
-    if isinstance(legacy_bbox, list) and len(legacy_bbox) == 4:
-        try:
-            x1, y1, x2, y2 = [float(v) for v in legacy_bbox]
-        except ValueError as exc:
-            raise ValueError("node bbox values are not numeric") from exc
-        return x1, y1, x2, y2, props
-
-    raise ValueError("node has no usable bbox_min/bbox_max (or legacy bbox)")
-
-
-def _cache_image_candidates(page_hash: str) -> List[Path]:
-    base = Path("drawing_pipeline") / "cache" / page_hash
-    return [
-        base / "step2b" / "page_context.png",
-        base / "step2c" / "spatial_overlay.png",
-        base / "step2b" / "remaining_bbox.png",
-    ]
-
-
-def _resolve_source_image_path(
-    *,
-    image: Optional[Union[str, Path]],
-    page_hash: Optional[str],
-) -> Tuple[Path, List[str]]:
-    warnings: List[str] = []
-    if image is not None:
-        path = Path(image).expanduser()
-        if not path.is_absolute():
-            path = Path.cwd() / path
-        if not path.exists():
-            raise ValueError(f"source image not found: {path}")
-        if not path.is_file():
-            raise ValueError(f"source image is not a file: {path}")
-        return path, warnings
-
-    if not page_hash:
-        raise ValueError(
-            "source image required: pass image=... or use uuid mode "
-            "with a page_hash in node properties"
-        )
-
-    for candidate in _cache_image_candidates(page_hash):
-        candidate_abs = candidate if candidate.is_absolute() else Path.cwd() / candidate
-        if candidate_abs.exists() and candidate_abs.is_file():
-            warnings.append(
-                "image auto-discovered from drawing_pipeline/cache using node page_hash"
-            )
-            return candidate_abs, warnings
-
-    raise ValueError(
-        "no default page image found for page_hash in cache; pass image=... explicitly"
-    )
-
-
-def _load_page_extents(payload: DocQueryCypherResult) -> Tuple[float, float, float, float]:
-    rows = _records(payload)
-    if not rows:
-        raise ValueError("failed to infer page extents: no bbox rows for page_hash")
-    row = rows[0]
-    try:
-        min_x = float(row["min_x"])
-        min_y = float(row["min_y"])
-        max_x = float(row["max_x"])
-        max_y = float(row["max_y"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("failed to infer page extents: invalid extent values") from exc
-    if max_x <= min_x or max_y <= min_y:
-        raise ValueError("failed to infer page extents: degenerate extents")
-    return min_x, min_y, max_x, max_y
-
-
-def _compute_crop_box(
-    *,
-    x1: float,
-    y1: float,
-    x2: float,
-    y2: float,
-    image_width: int,
-    image_height: int,
-    scale: Optional[float],
-    scale_x: Optional[float],
-    scale_y: Optional[float],
-    auto_scale: bool,
-    default_auto_scale: bool,
-    extents: Optional[Tuple[float, float, float, float]],
-    pad: int,
-    clamp: bool,
-) -> Tuple[int, int, int, int, str, float, float, float, float]:
-    if scale is not None and (scale_x is not None or scale_y is not None):
-        raise ValueError("use either scale or scale_x/scale_y, not both")
-
-    manual_scale_requested = scale is not None or scale_x is not None or scale_y is not None
-    if auto_scale and manual_scale_requested:
-        raise ValueError("auto_scale cannot be combined with explicit scale values")
-
-    eff_scale_x = 1.0
-    eff_scale_y = 1.0
-    offset_x = 0.0
-    offset_y = 0.0
-    scale_mode = "identity"
-
-    if scale is not None:
-        eff_scale_x = float(scale)
-        eff_scale_y = float(scale)
-        scale_mode = "manual_uniform"
-    elif scale_x is not None or scale_y is not None:
-        eff_scale_x = float(scale_x if scale_x is not None else 1.0)
-        eff_scale_y = float(scale_y if scale_y is not None else 1.0)
-        scale_mode = "manual_xy"
-    elif auto_scale or default_auto_scale:
-        if extents is None:
-            if auto_scale:
-                raise ValueError("auto_scale requires page_hash and resolvable bbox extents")
-        else:
-            min_x, min_y, max_x, max_y = extents
-            eff_scale_x = float(image_width) / float(max_x - min_x)
-            eff_scale_y = float(image_height) / float(max_y - min_y)
-            offset_x = min_x
-            offset_y = min_y
-            scale_mode = "auto_page_extents"
-
-    if eff_scale_x <= 0 or eff_scale_y <= 0:
-        raise ValueError("scale factors must be > 0")
-
-    px1 = (x1 - offset_x) * eff_scale_x
-    py1 = (y1 - offset_y) * eff_scale_y
-    px2 = (x2 - offset_x) * eff_scale_x
-    py2 = (y2 - offset_y) * eff_scale_y
-
-    left = int(math.floor(min(px1, px2))) - pad
-    top = int(math.floor(min(py1, py2))) - pad
-    right = int(math.ceil(max(px1, px2))) + pad
-    bottom = int(math.ceil(max(py1, py2))) + pad
-
-    if clamp:
-        left = max(0, min(left, image_width))
-        top = max(0, min(top, image_height))
-        right = max(0, min(right, image_width))
-        bottom = max(0, min(bottom, image_height))
-
-    if right <= left or bottom <= top:
-        raise ValueError("crop box is empty after scaling/clamping; adjust scale/bbox/pad")
-
-    return left, top, right, bottom, scale_mode, eff_scale_x, eff_scale_y, offset_x, offset_y
-
-
 # =============================================================================
 # Sheets
 # =============================================================================
@@ -613,7 +441,7 @@ class DocQuery:
     def node_get(self, uuid: str) -> DocQueryNodeGetResult:
         uuid = _normalize_text(uuid, field_name="uuid")
         return self._client.get(
-            f"/projects/{self._project_id}/docquery/node-get",
+            f"/projects/{self._project_id}/node-get",
             params={"uuid": uuid},
             cast_to=DocQueryNodeGetResult,
         )
@@ -630,7 +458,7 @@ class DocQuery:
         if entity_type is not None:
             params["entity_type"] = str(entity_type)
         return self._client.get(
-            f"/projects/{self._project_id}/docquery/sheet-entities",
+            f"/projects/{self._project_id}/sheet-entities",
             params=params,
             cast_to=DocQuerySheetEntitiesResult,
         )
@@ -645,7 +473,7 @@ class DocQuery:
         query = _normalize_text(query, field_name="query")
         index = _normalize_text(index, field_name="index")
         return self._client.get(
-            f"/projects/{self._project_id}/docquery/search",
+            f"/projects/{self._project_id}/search",
             params={"query": query, "index": index, "limit": int(limit)},
             cast_to=DocQuerySearchResult,
         )
@@ -654,23 +482,30 @@ class DocQuery:
         self,
         uuid: str,
         *,
+        mode: str = "both",
         direction: str = "both",
         relationship_type: Optional[str] = None,
+        radius: float = 200.0,
         limit: int = 50,
     ) -> DocQueryNeighborsResult:
         uuid = _normalize_text(uuid, field_name="uuid")
+        mode = _normalize_text(mode, field_name="mode").lower()
+        if mode not in {"graph", "spatial", "both"}:
+            raise ValueError("mode must be one of: graph, spatial, both")
         direction = _normalize_text(direction, field_name="direction").lower()
         if direction not in {"in", "out", "both"}:
             raise ValueError("direction must be one of: in, out, both")
         params: Dict[str, Any] = {
             "uuid": uuid,
+            "mode": mode,
             "direction": direction,
+            "radius": float(radius),
             "limit": int(limit),
         }
         if relationship_type is not None:
             params["relationship_type"] = str(relationship_type)
         return self._client.get(
-            f"/projects/{self._project_id}/docquery/neighbors",
+            f"/projects/{self._project_id}/neighbors",
             params=params,
             cast_to=DocQueryNeighborsResult,
         )
@@ -689,7 +524,7 @@ class DocQuery:
             "max_rows": int(max_rows),
         }
         return self._client.post(
-            f"/projects/{self._project_id}/docquery/cypher",
+            f"/projects/{self._project_id}/cypher",
             json=body,
             cast_to=DocQueryCypherResult,
         )
@@ -1163,148 +998,41 @@ class DocQuery:
         output: Union[str, Path],
         uuid: Optional[str] = None,
         bbox: Optional[Union[str, List[Any], Tuple[Any, Any, Any, Any]]] = None,
-        image: Optional[Union[str, Path]] = None,
         page_hash: Optional[str] = None,
-        scale: Optional[float] = None,
-        scale_x: Optional[float] = None,
-        scale_y: Optional[float] = None,
-        auto_scale: bool = False,
-        pad: int = 0,
-        clamp: bool = True,
     ) -> DocQueryCropResult:
-        try:
-            from PIL import Image
-        except ImportError as exc:
-            raise RuntimeError("Pillow is required for crop support. Install pillow>=10.") from exc
-
         if bool(uuid) == (bbox is not None):
             raise ValueError("provide exactly one of uuid or bbox")
 
         output_text = _normalize_text(str(output), field_name="output")
-        page_hash_value = str(page_hash).strip() if page_hash is not None else None
-        source_uuid: Optional[str] = None
-        source_sheet_id: Optional[str] = None
-        source_name: Optional[str] = None
-        source_category: Optional[str] = None
-
+        body: Dict[str, Any] = {}
         if uuid:
-            source_uuid = _normalize_text(uuid, field_name="uuid")
-            node_payload = self.node_get(source_uuid)
-            x1, y1, x2, y2, props = _extract_node_bbox(node_payload)
-            if not page_hash_value and props.get("page_hash") is not None:
-                page_hash_value = str(props.get("page_hash"))
-            if props.get("sheet_id") is not None:
-                source_sheet_id = str(props.get("sheet_id"))
-            source_name = props.get("name") or props.get("text")
-            if props.get("category") is not None:
-                source_category = str(props.get("category"))
+            body["uuid"] = _normalize_text(uuid, field_name="uuid")
         else:
-            x1, y1, x2, y2 = _parse_bbox_value(bbox if bbox is not None else "")
+            body["bbox"] = list(_parse_bbox_value(bbox if bbox is not None else ""))
+            page_hash_value = _normalize_text(page_hash, field_name="page_hash")
+            body["page_hash"] = page_hash_value
 
-        source_image_path, warnings = _resolve_source_image_path(
-            image=image,
-            page_hash=page_hash_value,
+        png_bytes = self._client.post(
+            f"/projects/{self._project_id}/crop",
+            json=body,
+            expect_bytes=True,
         )
+        if not isinstance(png_bytes, bytes):
+            raise ValueError("crop endpoint did not return image bytes")
 
+        content_type = "image/png"
         output_path = Path(output_text).expanduser()
         if not output_path.is_absolute():
             output_path = Path.cwd() / output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with Image.open(source_image_path) as img:
-            image_width, image_height = img.size
-
-            extents: Optional[Tuple[float, float, float, float]] = None
-            should_try_default_auto = bool(uuid)
-            if auto_scale or should_try_default_auto:
-                if page_hash_value:
-                    try:
-                        extents_payload = self.cypher(
-                            "MATCH (n:Entity {project_id:$project_id, page_hash:$page_hash}) "
-                            "WHERE n.bbox_min IS NOT NULL AND n.bbox_max IS NOT NULL "
-                            "RETURN min(n.bbox_min.x) AS min_x, min(n.bbox_min.y) AS min_y, "
-                            "       max(n.bbox_max.x) AS max_x, max(n.bbox_max.y) AS max_y "
-                            "LIMIT 1",
-                            params={"page_hash": page_hash_value},
-                            max_rows=1,
-                        )
-                        extents = _load_page_extents(extents_payload)
-                    except ValueError:
-                        if auto_scale:
-                            raise
-                        warnings.append("auto-scale failed; fell back to identity scale")
-                elif auto_scale:
-                    raise ValueError("auto_scale requires page_hash and resolvable bbox extents")
-
-            safe_pad = max(0, int(pad))
-            clamp_box = bool(clamp)
-            left, top, right, bottom, scale_mode, eff_scale_x, eff_scale_y, offset_x, offset_y = (
-                _compute_crop_box(
-                    x1=x1,
-                    y1=y1,
-                    x2=x2,
-                    y2=y2,
-                    image_width=image_width,
-                    image_height=image_height,
-                    scale=scale,
-                    scale_x=scale_x,
-                    scale_y=scale_y,
-                    auto_scale=bool(auto_scale),
-                    default_auto_scale=should_try_default_auto,
-                    extents=extents,
-                    pad=safe_pad,
-                    clamp=clamp_box,
-                )
-            )
-            cropped = img.crop((left, top, right, bottom))
-            crop_width, crop_height = cropped.size
-            cropped.save(output_path)
+        output_path.write_bytes(png_bytes)
 
         return DocQueryCropResult.model_validate(
             {
                 "ok": True,
-                "command": "crop",
-                "input": {
-                    "project_id": self._project_id,
-                    "uuid": source_uuid,
-                    "bbox": (None if uuid else [x1, y1, x2, y2]),
-                    "page_hash": page_hash_value,
-                    "image": str(source_image_path),
-                    "output": str(output_path),
-                    "scale": scale,
-                    "scale_x": scale_x,
-                    "scale_y": scale_y,
-                    "auto_scale": bool(auto_scale),
-                    "pad": safe_pad,
-                    "clamp": clamp_box,
-                },
-                "source": {
-                    "mode": ("uuid" if uuid else "bbox"),
-                    "uuid": source_uuid,
-                    "sheet_id": source_sheet_id,
-                    "name": source_name,
-                    "category": source_category,
-                    "bbox_graph": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-                    "bbox_pixels": {"left": left, "top": top, "right": right, "bottom": bottom},
-                },
-                "image": {
-                    "path": str(source_image_path),
-                    "width": image_width,
-                    "height": image_height,
-                },
-                "output_image": {
-                    "path": str(output_path),
-                    "width": crop_width,
-                    "height": crop_height,
-                },
-                "transform": {
-                    "scale_mode": scale_mode,
-                    "scale_x": eff_scale_x,
-                    "scale_y": eff_scale_y,
-                    "offset_x": offset_x,
-                    "offset_y": offset_y,
-                },
-                "warnings": warnings,
+                "output_path": str(output_path),
+                "bytes_written": len(png_bytes),
+                "content_type": content_type,
             }
         )
 
@@ -1319,7 +1047,7 @@ class AsyncDocQuery:
     async def node_get(self, uuid: str) -> DocQueryNodeGetResult:
         uuid = _normalize_text(uuid, field_name="uuid")
         return await self._client.get(
-            f"/projects/{self._project_id}/docquery/node-get",
+            f"/projects/{self._project_id}/node-get",
             params={"uuid": uuid},
             cast_to=DocQueryNodeGetResult,
         )
@@ -1336,7 +1064,7 @@ class AsyncDocQuery:
         if entity_type is not None:
             params["entity_type"] = str(entity_type)
         return await self._client.get(
-            f"/projects/{self._project_id}/docquery/sheet-entities",
+            f"/projects/{self._project_id}/sheet-entities",
             params=params,
             cast_to=DocQuerySheetEntitiesResult,
         )
@@ -1351,7 +1079,7 @@ class AsyncDocQuery:
         query = _normalize_text(query, field_name="query")
         index = _normalize_text(index, field_name="index")
         return await self._client.get(
-            f"/projects/{self._project_id}/docquery/search",
+            f"/projects/{self._project_id}/search",
             params={"query": query, "index": index, "limit": int(limit)},
             cast_to=DocQuerySearchResult,
         )
@@ -1360,23 +1088,30 @@ class AsyncDocQuery:
         self,
         uuid: str,
         *,
+        mode: str = "both",
         direction: str = "both",
         relationship_type: Optional[str] = None,
+        radius: float = 200.0,
         limit: int = 50,
     ) -> DocQueryNeighborsResult:
         uuid = _normalize_text(uuid, field_name="uuid")
+        mode = _normalize_text(mode, field_name="mode").lower()
+        if mode not in {"graph", "spatial", "both"}:
+            raise ValueError("mode must be one of: graph, spatial, both")
         direction = _normalize_text(direction, field_name="direction").lower()
         if direction not in {"in", "out", "both"}:
             raise ValueError("direction must be one of: in, out, both")
         params: Dict[str, Any] = {
             "uuid": uuid,
+            "mode": mode,
             "direction": direction,
+            "radius": float(radius),
             "limit": int(limit),
         }
         if relationship_type is not None:
             params["relationship_type"] = str(relationship_type)
         return await self._client.get(
-            f"/projects/{self._project_id}/docquery/neighbors",
+            f"/projects/{self._project_id}/neighbors",
             params=params,
             cast_to=DocQueryNeighborsResult,
         )
@@ -1395,7 +1130,7 @@ class AsyncDocQuery:
             "max_rows": int(max_rows),
         }
         return await self._client.post(
-            f"/projects/{self._project_id}/docquery/cypher",
+            f"/projects/{self._project_id}/cypher",
             json=body,
             cast_to=DocQueryCypherResult,
         )
@@ -1879,148 +1614,41 @@ class AsyncDocQuery:
         output: Union[str, Path],
         uuid: Optional[str] = None,
         bbox: Optional[Union[str, List[Any], Tuple[Any, Any, Any, Any]]] = None,
-        image: Optional[Union[str, Path]] = None,
         page_hash: Optional[str] = None,
-        scale: Optional[float] = None,
-        scale_x: Optional[float] = None,
-        scale_y: Optional[float] = None,
-        auto_scale: bool = False,
-        pad: int = 0,
-        clamp: bool = True,
     ) -> DocQueryCropResult:
-        try:
-            from PIL import Image
-        except ImportError as exc:
-            raise RuntimeError("Pillow is required for crop support. Install pillow>=10.") from exc
-
         if bool(uuid) == (bbox is not None):
             raise ValueError("provide exactly one of uuid or bbox")
 
         output_text = _normalize_text(str(output), field_name="output")
-        page_hash_value = str(page_hash).strip() if page_hash is not None else None
-        source_uuid: Optional[str] = None
-        source_sheet_id: Optional[str] = None
-        source_name: Optional[str] = None
-        source_category: Optional[str] = None
-
+        body: Dict[str, Any] = {}
         if uuid:
-            source_uuid = _normalize_text(uuid, field_name="uuid")
-            node_payload = await self.node_get(source_uuid)
-            x1, y1, x2, y2, props = _extract_node_bbox(node_payload)
-            if not page_hash_value and props.get("page_hash") is not None:
-                page_hash_value = str(props.get("page_hash"))
-            if props.get("sheet_id") is not None:
-                source_sheet_id = str(props.get("sheet_id"))
-            source_name = props.get("name") or props.get("text")
-            if props.get("category") is not None:
-                source_category = str(props.get("category"))
+            body["uuid"] = _normalize_text(uuid, field_name="uuid")
         else:
-            x1, y1, x2, y2 = _parse_bbox_value(bbox if bbox is not None else "")
+            body["bbox"] = list(_parse_bbox_value(bbox if bbox is not None else ""))
+            page_hash_value = _normalize_text(page_hash, field_name="page_hash")
+            body["page_hash"] = page_hash_value
 
-        source_image_path, warnings = _resolve_source_image_path(
-            image=image,
-            page_hash=page_hash_value,
+        png_bytes = await self._client.post(
+            f"/projects/{self._project_id}/crop",
+            json=body,
+            expect_bytes=True,
         )
+        if not isinstance(png_bytes, bytes):
+            raise ValueError("crop endpoint did not return image bytes")
 
+        content_type = "image/png"
         output_path = Path(output_text).expanduser()
         if not output_path.is_absolute():
             output_path = Path.cwd() / output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with Image.open(source_image_path) as img:
-            image_width, image_height = img.size
-
-            extents: Optional[Tuple[float, float, float, float]] = None
-            should_try_default_auto = bool(uuid)
-            if auto_scale or should_try_default_auto:
-                if page_hash_value:
-                    try:
-                        extents_payload = await self.cypher(
-                            "MATCH (n:Entity {project_id:$project_id, page_hash:$page_hash}) "
-                            "WHERE n.bbox_min IS NOT NULL AND n.bbox_max IS NOT NULL "
-                            "RETURN min(n.bbox_min.x) AS min_x, min(n.bbox_min.y) AS min_y, "
-                            "       max(n.bbox_max.x) AS max_x, max(n.bbox_max.y) AS max_y "
-                            "LIMIT 1",
-                            params={"page_hash": page_hash_value},
-                            max_rows=1,
-                        )
-                        extents = _load_page_extents(extents_payload)
-                    except ValueError:
-                        if auto_scale:
-                            raise
-                        warnings.append("auto-scale failed; fell back to identity scale")
-                elif auto_scale:
-                    raise ValueError("auto_scale requires page_hash and resolvable bbox extents")
-
-            safe_pad = max(0, int(pad))
-            clamp_box = bool(clamp)
-            left, top, right, bottom, scale_mode, eff_scale_x, eff_scale_y, offset_x, offset_y = (
-                _compute_crop_box(
-                    x1=x1,
-                    y1=y1,
-                    x2=x2,
-                    y2=y2,
-                    image_width=image_width,
-                    image_height=image_height,
-                    scale=scale,
-                    scale_x=scale_x,
-                    scale_y=scale_y,
-                    auto_scale=bool(auto_scale),
-                    default_auto_scale=should_try_default_auto,
-                    extents=extents,
-                    pad=safe_pad,
-                    clamp=clamp_box,
-                )
-            )
-            cropped = img.crop((left, top, right, bottom))
-            crop_width, crop_height = cropped.size
-            cropped.save(output_path)
+        output_path.write_bytes(png_bytes)
 
         return DocQueryCropResult.model_validate(
             {
                 "ok": True,
-                "command": "crop",
-                "input": {
-                    "project_id": self._project_id,
-                    "uuid": source_uuid,
-                    "bbox": (None if uuid else [x1, y1, x2, y2]),
-                    "page_hash": page_hash_value,
-                    "image": str(source_image_path),
-                    "output": str(output_path),
-                    "scale": scale,
-                    "scale_x": scale_x,
-                    "scale_y": scale_y,
-                    "auto_scale": bool(auto_scale),
-                    "pad": safe_pad,
-                    "clamp": clamp_box,
-                },
-                "source": {
-                    "mode": ("uuid" if uuid else "bbox"),
-                    "uuid": source_uuid,
-                    "sheet_id": source_sheet_id,
-                    "name": source_name,
-                    "category": source_category,
-                    "bbox_graph": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-                    "bbox_pixels": {"left": left, "top": top, "right": right, "bottom": bottom},
-                },
-                "image": {
-                    "path": str(source_image_path),
-                    "width": image_width,
-                    "height": image_height,
-                },
-                "output_image": {
-                    "path": str(output_path),
-                    "width": crop_width,
-                    "height": crop_height,
-                },
-                "transform": {
-                    "scale_mode": scale_mode,
-                    "scale_x": eff_scale_x,
-                    "scale_y": eff_scale_y,
-                    "offset_x": offset_x,
-                    "offset_y": offset_y,
-                },
-                "warnings": warnings,
+                "output_path": str(output_path),
+                "bytes_written": len(png_bytes),
+                "content_type": content_type,
             }
         )
 

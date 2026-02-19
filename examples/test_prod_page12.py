@@ -33,11 +33,6 @@ def _parse_args() -> argparse.Namespace:
         default=os.environ.get("STRUAI_BASE_URL", "https://api.stru.ai"),
         help="Base URL (SDK appends /v1 automatically when needed)",
     )
-    parser.add_argument(
-        "--delete",
-        action="store_true",
-        help="Delete the drawing result at the end",
-    )
     return parser.parse_args()
 
 
@@ -81,15 +76,7 @@ def main() -> int:
         "revision_clouds="
         f"{len(result.annotations.revision_clouds)}"
     )
-
-    fetched = client.drawings.get(result.id)
-    print(f"get_drawing_id={fetched.id} get_page={fetched.page}")
-
-    if args.delete:
-        deleted = client.drawings.delete(result.id)
-        print(f"deleted={deleted.deleted} drawing_id={deleted.id}")
-    else:
-        print(f"kept_drawing_id={result.id}")
+    print("drawings_get_delete_endpoints_removed=true")
 
     return 0
 

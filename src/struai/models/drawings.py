@@ -74,7 +74,7 @@ class TitleBlock(SDKBaseModel):
 
 
 class DrawingResult(SDKBaseModel):
-    """Result returned by POST/GET /v1/drawings."""
+    """Result returned by POST /v1/drawings."""
 
     id: str
     page: int
@@ -89,10 +89,3 @@ class DrawingCacheStatus(SDKBaseModel):
 
     cached: bool
     file_hash: str
-
-
-class DrawingDeleteResult(SDKBaseModel):
-    """Result returned by DELETE /v1/drawings/{id}."""
-
-    deleted: bool
-    id: str

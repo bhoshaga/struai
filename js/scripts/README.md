@@ -24,7 +24,6 @@ STRUAI_PAGE=12 node scripts/projects_workflow.mjs
 
 # Full workflow + crop demo
 STRUAI_PAGE=12 \
-STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png \
 STRUAI_CROP_OUTPUT=/absolute/path/to/crop.png \
 node scripts/projects_workflow.mjs
 

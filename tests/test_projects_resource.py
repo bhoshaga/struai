@@ -9,12 +9,7 @@ from struai.resources.projects import Job, JobBatch, ProjectInstance
 def _cypher_payload(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "ok": True,
-        "command": "cypher",
-        "input": {},
         "records": records,
-        "record_count": len(records),
-        "truncated": False,
-        "summary": {},
     }
 
 
@@ -39,19 +34,10 @@ class FakeClient:
             }
             return cast_to.model_validate(payload) if cast_to else payload
 
-        if path == "/projects/proj/docquery/search":
+        if path == "/projects/proj/search":
             payload = {
                 "ok": True,
-                "command": "search",
-                "input": {
-                    "project_id": "proj",
-                    "index": "entity_search",
-                    "query": "beam",
-                    "limit": 10,
-                },
                 "hits": [{"node": {"properties": {"uuid": "node_1"}}, "score": 0.9}],
-                "count": 1,
-                "summary": {},
             }
             return cast_to.model_validate(payload) if cast_to else payload
 
@@ -71,7 +57,7 @@ class FakeClient:
                 }
             return cast_to.model_validate(payload) if cast_to else payload
 
-        if path == "/projects/proj/docquery/cypher":
+        if path == "/projects/proj/cypher":
             self.cypher_calls += 1
             if self.cypher_calls == 1:
                 payload = _cypher_payload([])
@@ -148,7 +134,7 @@ def test_docquery_search_parses_payload() -> None:
     project = ProjectInstance(client, cast_to_project())
 
     response = project.docquery.search("beam", limit=10)
-    assert response.count == 1
+    assert len(response.hits) == 1
     assert response.hits[0].score == 0.9
     assert response.hits[0].node["properties"]["uuid"] == "node_1"
 

@@ -35,7 +35,7 @@ const jobOrBatch = await project.sheets.add(null, {
 });
 
 const search = await project.docquery.search('beam connection', { limit: 5 });
-console.log(search.count);
+console.log(search.hits.length);
 ```
 
 ## Real Workflow Examples
@@ -74,8 +74,6 @@ See `scripts/README.md` for quick copy/paste commands.
   - Pass either `file` or `fileHash`.
   - `file` can be a file path string, `Blob`, `ArrayBuffer`, or typed array.
 - `checkCache(fileHash) -> Promise<DrawingCacheStatus>`
-- `get(drawingId) -> Promise<DrawingResult>`
-- `delete(drawingId) -> Promise<DrawingDeleteResult>`
 - `computeFileHash(file) -> Promise<string>`
 
 ### Projects Top-Level (`client.projects`)
@@ -109,12 +107,12 @@ Methods:
 - `nodeGet(uuid) -> Promise<DocQueryNodeGetResult>`
 - `sheetEntities(sheetId, { entityType?, limit? }?) -> Promise<DocQuerySheetEntitiesResult>`
 - `search(query, { index?, limit? }?) -> Promise<DocQuerySearchResult>`
-- `neighbors(uuid, { direction?, relationshipType?, limit? }?) -> Promise<DocQueryNeighborsResult>`
+- `neighbors(uuid, { mode?, direction?, relationshipType?, radius?, limit? }?) -> Promise<DocQueryNeighborsResult>`
 - `cypher(query, { params?, maxRows? }?) -> Promise<DocQueryCypherResult>`
 - `sheetSummary(sheetId, { orphanLimit? }?) -> Promise<DocQuerySheetSummaryResult>`
 - `sheetList() -> Promise<DocQuerySheetListResult>`
 - `referenceResolve(uuid, { limit? }?) -> Promise<DocQueryReferenceResolveResult>`
-- `crop({ output, uuid?, bbox?, image?, pageHash?, scale?, scaleX?, scaleY?, autoScale?, pad?, clamp? }) -> Promise<DocQueryCropResult>`
+- `crop({ output, uuid?, bbox?, pageHash? }) -> Promise<DocQueryCropResult>`
 
 CLI parity: `project-list` maps to `client.projects.list()`, and the remaining 9 commands map to `project.docquery.*`, for full 10-command parity.
 
@@ -126,10 +124,9 @@ const cypher = await project.docquery.cypher(
 );
 const crop = await project.docquery.crop({
   uuid: 'entity-uuid-here',
-  image: '/absolute/path/to/page_context.png',
   output: '/absolute/path/to/crop.png',
 });
-console.log(cypher.records[0]?.total, crop.output_image.path);
+console.log(cypher.records[0]?.total, crop.output_path, crop.bytes_written);
 ```
 
 ### Jobs
@@ -151,8 +148,6 @@ console.log(cypher.records[0]?.total, crop.output_image.path);
 Tier 1:
 
 - `POST /v1/drawings`
-- `GET /v1/drawings/{id}`
-- `DELETE /v1/drawings/{id}`
 - `GET /v1/drawings/cache/{file_hash}`
 
 Tier 2:
@@ -163,11 +158,12 @@ Tier 2:
 - `POST /v1/projects/{project_id}/sheets`
 - `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
 - `GET /v1/projects/{project_id}/jobs/{job_id}`
-- `GET /v1/projects/{project_id}/docquery/node-get`
-- `GET /v1/projects/{project_id}/docquery/sheet-entities`
-- `GET /v1/projects/{project_id}/docquery/search`
-- `GET /v1/projects/{project_id}/docquery/neighbors`
-- `POST /v1/projects/{project_id}/docquery/cypher`
+- `GET /v1/projects/{project_id}/node-get`
+- `GET /v1/projects/{project_id}/sheet-entities`
+- `GET /v1/projects/{project_id}/search`
+- `GET /v1/projects/{project_id}/neighbors`
+- `POST /v1/projects/{project_id}/cypher`
+- `POST /v1/projects/{project_id}/crop`
 
 ## License
 

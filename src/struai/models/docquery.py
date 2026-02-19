@@ -41,53 +41,38 @@ class DocQuerySearchHit(SDKBaseModel):
 class DocQueryNeighbor(SDKBaseModel):
     direction: Optional[str] = None
     relationship: Optional[Dict[str, Any]] = None
-    neighbor_node: Optional[Dict[str, Any]] = None
+    neighbor: Optional[Dict[str, Any]] = None
+    distance_px: Optional[float] = None
+    linked: Optional[bool] = None
+    edges: Optional[List[Dict[str, Any]]] = None
 
 
 class DocQueryNodeGetResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
     found: bool
     node: Optional[Dict[str, Any]] = None
-    summary: Optional[DocQuerySummary] = None
 
 
 class DocQuerySheetEntitiesResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
     entities: List[Dict[str, Any]] = Field(default_factory=list)
-    count: int = 0
-    summary: Optional[DocQuerySummary] = None
 
 
 class DocQuerySearchResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
     hits: List[DocQuerySearchHit] = Field(default_factory=list)
-    count: int = 0
-    summary: Optional[DocQuerySummary] = None
 
 
 class DocQueryNeighborsResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
+    mode: Optional[str] = None
     neighbors: List[DocQueryNeighbor] = Field(default_factory=list)
-    count: int = 0
-    summary: Optional[DocQuerySummary] = None
 
 
 class DocQueryCypherResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
     records: List[Dict[str, Any]] = Field(default_factory=list)
-    record_count: int = 0
-    truncated: bool = False
-    summary: Optional[DocQuerySummary] = None
+    truncated: Optional[bool] = None
 
 
 class DocQuerySheetSummaryResult(SDKBaseModel):
@@ -125,10 +110,6 @@ class DocQueryReferenceResolveResult(SDKBaseModel):
 
 class DocQueryCropResult(SDKBaseModel):
     ok: bool
-    command: str
-    input: Dict[str, Any] = Field(default_factory=dict)
-    source: Dict[str, Any] = Field(default_factory=dict)
-    image: Dict[str, Any] = Field(default_factory=dict)
-    output_image: Dict[str, Any] = Field(default_factory=dict)
-    transform: Dict[str, Any] = Field(default_factory=dict)
-    warnings: List[str] = Field(default_factory=list)
+    output_path: str
+    bytes_written: int
+    content_type: str

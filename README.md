@@ -38,7 +38,7 @@ job = project.sheets.add(page=12, file_hash=client.drawings.compute_file_hash("s
 sheet = job.wait(timeout=180)
 
 hits = project.docquery.search("beam connection", limit=5)
-print(hits.count)
+print(len(hits.hits))
 ```
 
 ## Real Workflow Examples
@@ -46,7 +46,7 @@ print(hits.count)
 Python examples (`/examples`):
 
 ```bash
-# Drawings-only flow (hash, cache probe, analyze, get, optional delete)
+# Drawings-only flow (hash, cache probe, analyze)
 python3 examples/test_prod_page12.py --pdf /absolute/path/to/structural.pdf --page 12
 
 # Full projects + docquery workflow
@@ -55,7 +55,6 @@ python3 examples/test_prod_page12_full.py --pdf /absolute/path/to/structural.pdf
 # Full workflow + crop demo
 python3 examples/test_prod_page12_full.py \
   --pdf /absolute/path/to/structural.pdf --page 12 \
-  --crop-image /absolute/path/to/page_context.png \
   --crop-output /absolute/path/to/crop.png
 
 # Optional cleanup after full workflow
@@ -88,7 +87,6 @@ node scripts/projects_workflow.mjs
 # Full workflow + crop demo
 STRUAI_API_KEY=... STRUAI_BASE_URL=https://api.stru.ai \
 STRUAI_PDF=/absolute/path/to/structural.pdf STRUAI_PAGE=12 \
-STRUAI_CROP_IMAGE=/absolute/path/to/page_context.png \
 STRUAI_CROP_OUTPUT=/absolute/path/to/crop.png \
 node scripts/projects_workflow.mjs
 ```
@@ -108,8 +106,6 @@ Async API (`AsyncStruAI`) mirrors the same resource shape and method names; use 
 
 - `analyze(file=None, page=1, file_hash=None) -> DrawingResult`
 - `check_cache(file_hash) -> DrawingCacheStatus`
-- `get(drawing_id) -> DrawingResult`
-- `delete(drawing_id) -> DrawingDeleteResult`
 - `compute_file_hash(file) -> str`
 
 ### Projects Top-Level (`client.projects`)
@@ -141,12 +137,12 @@ Methods:
 - `node_get(uuid) -> DocQueryNodeGetResult`
 - `sheet_entities(sheet_id, entity_type=None, limit=200) -> DocQuerySheetEntitiesResult`
 - `search(query, index="entity_search", limit=20) -> DocQuerySearchResult`
-- `neighbors(uuid, direction="both", relationship_type=None, limit=50) -> DocQueryNeighborsResult`
+- `neighbors(uuid, mode="both", direction="both", relationship_type=None, radius=200.0, limit=50) -> DocQueryNeighborsResult`
 - `cypher(query, params=None, max_rows=500) -> DocQueryCypherResult`
 - `sheet_summary(sheet_id, orphan_limit=10) -> DocQuerySheetSummaryResult`
 - `sheet_list() -> DocQuerySheetListResult`
 - `reference_resolve(uuid, limit=100) -> DocQueryReferenceResolveResult`
-- `crop(output, uuid=None, bbox=None, image=None, page_hash=None, scale=None, scale_x=None, scale_y=None, auto_scale=False, pad=0, clamp=True) -> DocQueryCropResult`
+- `crop(output, uuid=None, bbox=None, page_hash=None) -> DocQueryCropResult`
 
 CLI parity: `project-list` maps to `client.projects.list()`, and the remaining 9 commands map to `project.docquery.*`, for full 10-command parity.
 
@@ -162,10 +158,9 @@ rows = project.docquery.cypher(
 
 crop = project.docquery.crop(
     uuid="entity-uuid-here",
-    image="/absolute/path/to/page_context.png",
     output="/absolute/path/to/crop.png",
 )
-print(rows.records[0]["total"], crop.output_image["path"])
+print(rows.records[0]["total"], crop.output_path, crop.bytes_written)
 ```
 
 ### Jobs
@@ -187,8 +182,6 @@ print(rows.records[0]["total"], crop.output_image["path"])
 Tier 1:
 
 - `POST /v1/drawings`
-- `GET /v1/drawings/{id}`
-- `DELETE /v1/drawings/{id}`
 - `GET /v1/drawings/cache/{file_hash}`
 
 Tier 2:
@@ -199,11 +192,12 @@ Tier 2:
 - `POST /v1/projects/{project_id}/sheets`
 - `DELETE /v1/projects/{project_id}/sheets/{sheet_id}`
 - `GET /v1/projects/{project_id}/jobs/{job_id}`
-- `GET /v1/projects/{project_id}/docquery/node-get`
-- `GET /v1/projects/{project_id}/docquery/sheet-entities`
-- `GET /v1/projects/{project_id}/docquery/search`
-- `GET /v1/projects/{project_id}/docquery/neighbors`
-- `POST /v1/projects/{project_id}/docquery/cypher`
+- `GET /v1/projects/{project_id}/node-get`
+- `GET /v1/projects/{project_id}/sheet-entities`
+- `GET /v1/projects/{project_id}/search`
+- `GET /v1/projects/{project_id}/neighbors`
+- `POST /v1/projects/{project_id}/cypher`
+- `POST /v1/projects/{project_id}/crop`
 
 ## JavaScript Reference
 

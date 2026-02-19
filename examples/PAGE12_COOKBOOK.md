@@ -1,6 +1,6 @@
 # Page 12 Cookbook (Python + JS)
 
-This cookbook shows end-to-end DocQuery traversal on structural page 12, including `cypher` and image `crop`.
+This cookbook shows end-to-end DocQuery traversal on structural page 12, including `cypher` and server-side `crop`.
 
 ## Target Context
 
@@ -8,8 +8,6 @@ This cookbook shows end-to-end DocQuery traversal on structural page 12, includi
 - Page: `12`
 - Typical project used in QC: `proj_86c0f02e`
 - Typical sheet on page 12: `S111`
-- Example cached page image for crop:
-  - `/Users/bhoshaga/PycharmProjects/stru/drawing_pipeline/cache/66b98c7019417252/step2b/page_context.png`
 
 ## Install
 
@@ -49,11 +47,11 @@ print("unreachable:", sheet_summary.reachability.get("unreachable_non_sheet", 0)
 
 # 4) sheet-entities
 entities = project.docquery.sheet_entities(sheet_id, limit=20)
-print("entities_count:", entities.count)
+print("entities_count:", len(entities.entities))
 
 # 5) search
 search = project.docquery.search("section S311", limit=5)
-print("search_count:", search.count)
+print("search_count:", len(search.hits))
 
 # 6) cypher (custom query string + params)
 cypher = project.docquery.cypher(
@@ -63,7 +61,7 @@ cypher = project.docquery.cypher(
     params={"sheet_id": sheet_id},
     max_rows=1,
 )
-print("cypher_rows:", cypher.record_count)
+print("cypher_rows:", len(cypher.records))
 
 if not cypher.records:
     raise RuntimeError("No bbox-capable node found for this sheet")
@@ -75,8 +73,8 @@ node = project.docquery.node_get(node_uuid)
 print("node_found:", node.found, "uuid:", node_uuid)
 
 # 8) neighbors
-neighbors = project.docquery.neighbors(node_uuid, direction="both", limit=10)
-print("neighbors_count:", neighbors.count)
+neighbors = project.docquery.neighbors(node_uuid, mode="both", direction="both", radius=200.0, limit=10)
+print("neighbors_count:", len(neighbors.neighbors))
 
 # 9) reference-resolve
 resolved = project.docquery.reference_resolve(node_uuid, limit=20)
@@ -85,18 +83,17 @@ print("reference_count:", resolved.count, "warnings:", len(resolved.warnings))
 # 10) crop (uuid mode)
 crop_uuid = project.docquery.crop(
     uuid=node_uuid,
-    image="/Users/bhoshaga/PycharmProjects/stru/drawing_pipeline/cache/66b98c7019417252/step2b/page_context.png",
     output="/tmp/page12_crop_from_uuid.png",
 )
-print("crop_uuid:", crop_uuid.output_image["path"], crop_uuid.output_image["width"], crop_uuid.output_image["height"])
+print("crop_uuid:", crop_uuid.output_path, crop_uuid.bytes_written, crop_uuid.content_type)
 
 # Optional: crop (bbox mode)
 crop_bbox = project.docquery.crop(
     bbox=[1000, 700, 1400, 980],
-    image="/Users/bhoshaga/PycharmProjects/stru/drawing_pipeline/cache/66b98c7019417252/step2b/page_context.png",
+    page_hash="66b98c7019417252",
     output="/tmp/page12_crop_from_bbox.png",
 )
-print("crop_bbox:", crop_bbox.output_image["path"], crop_bbox.output_image["width"], crop_bbox.output_image["height"])
+print("crop_bbox:", crop_bbox.output_path, crop_bbox.bytes_written, crop_bbox.content_type)
 ```
 
 ## JavaScript: Core Traversal + Cypher + Crop
@@ -128,11 +125,10 @@ const cypher = await project.docquery.cypher(
 const uuid = String(cypher.records[0].uuid);
 const crop = await project.docquery.crop({
   uuid,
-  image: "/Users/bhoshaga/PycharmProjects/stru/drawing_pipeline/cache/66b98c7019417252/step2b/page_context.png",
   output: "/tmp/page12_crop_js.png",
 });
 
-console.log("crop:", crop.output_image.path, crop.output_image.width, crop.output_image.height);
+console.log("crop:", crop.output_path, crop.bytes_written, crop.content_type);
 ```
 
 ## Notes
