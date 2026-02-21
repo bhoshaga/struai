@@ -126,8 +126,11 @@ def main() -> int:
     cypher = _call_with_retry(
         lambda: project.docquery.cypher(
             "MATCH (n:Entity {project_id:$project_id, sheet_id:$sheet_id}) "
-            "WHERE n.bbox_min IS NOT NULL AND n.bbox_max IS NOT NULL "
-            "RETURN n.uuid AS uuid, n.page_hash AS page_hash LIMIT 1",
+            "WHERE NOT n:Sheet AND NOT n:Zone "
+            "  AND n.bbox_min IS NOT NULL AND n.bbox_max IS NOT NULL "
+            "RETURN n.uuid AS uuid, n.page_hash AS page_hash "
+            "ORDER BY (n.bbox_max.x - n.bbox_min.x) * (n.bbox_max.y - n.bbox_min.y) "
+            "LIMIT 1",
             params={"sheet_id": sheet_id},
             max_rows=1,
         ),

@@ -15,6 +15,13 @@
   ([`eb5c28d`](https://github.com/bhoshaga/struai/commit/eb5c28d22a5f3bb0edf0321d30c593ee15b9e50f))
 
 
+## v2.2.1 (2026-02-21)
+
+### Bug Fixes
+
+- Fix `AsyncJobBatch.wait_all()` and `status_all()` to poll jobs concurrently via `asyncio.gather()` (was sequential)
+- Fix cookbook cypher query to exclude Sheet/Zone nodes for crop demo (avoids OOM on full-page renders)
+
 ## Unreleased
 
 ### Breaking Changes

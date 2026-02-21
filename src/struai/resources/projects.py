@@ -174,17 +174,21 @@ class AsyncJobBatch:
         return [job.id for job in self.jobs]
 
     async def status_all(self) -> List[JobStatus]:
-        return [await job.status() for job in self.jobs]
+        return list(await asyncio.gather(*(job.status() for job in self.jobs)))
 
     async def wait_all(
         self,
         timeout_per_job: float = 120,
         poll_interval: float = 2,
     ) -> List[SheetResult]:
-        return [
-            await job.wait(timeout=timeout_per_job, poll_interval=poll_interval)
-            for job in self.jobs
-        ]
+        return list(
+            await asyncio.gather(
+                *(
+                    job.wait(timeout=timeout_per_job, poll_interval=poll_interval)
+                    for job in self.jobs
+                )
+            )
+        )
 
 
 # =============================================================================
